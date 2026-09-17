@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fiche Titre — ValueBoard</title>
+<link rel="stylesheet" href="css/style.css">
+<script>
+  if (sessionStorage.getItem("valueboard_session") !== "1") { location.href = "login.html"; }
+</script>
+</head>
+<body>
+<div id="layout">
+  <main class="content">
+    <h1>🗂️ Fiche Titre</h1>
+    <p class="caption">La vue de travail pour décider sur UN titre : score détaillé, checklist, calculateur, alertes.</p>
+
+    <div id="empty" class="info-box" style="display:none;">Ajoute d'abord des titres dans la <strong>Watchlist</strong>.</div>
+
+    <div id="body" style="display:none;">
+      <label>Titre</label>
+      <select id="title-select"></select>
+
+      <div class="card" style="margin-top:16px;">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap;">
+          <div>
+            <h2 style="margin:0;" id="fh-name"></h2>
+            <p class="caption" id="fh-sub" style="margin:4px 0 0;"></p>
+          </div>
+          <div style="text-align:center;">
+            <div class="label" style="font-size:13px; color:var(--ink-soft);">Score composite</div>
+            <div style="font-size:26px; font-weight:700;" id="fh-score"></div>
+          </div>
+          <div id="fh-verdict"></div>
+        </div>
+        <p class="caption" id="fh-coverage" style="margin-top:10px;"></p>
+      </div>
+
+      <div id="fh-alerts"></div>
+
+      <hr class="divider">
+      <div class="grid-2">
+        <div>
+          <h2>Profil du titre</h2>
+          <div id="radar-chart" class="chart-box"></div>
+        </div>
+        <div>
+          <h2>Détail des sous-scores</h2>
+          <div id="subscores"></div>
+        </div>
+      </div>
+
+      <hr class="divider">
+      <h2>Checklist Graham</h2>
+      <div id="checklist" class="form-row"></div>
+      <button type="button" id="save-checklist" style="margin-top:10px;">Enregistrer la checklist</button>
+
+      <hr class="divider">
+      <h2>Calculateur de valeur intrinsèque</h2>
+      <div class="pill-toggle">
+        <label><input type="radio" name="methode" value="graham" checked> Graham Number</label>
+        <label><input type="radio" name="methode" value="dcf"> DCF simplifié</label>
+      </div>
+
+      <div id="graham-form">
+        <div class="form-row">
+          <div><label>BPA</label><input type="number" id="g-bpa" step="0.01"></div>
+          <div><label>Valeur comptable par action</label><input type="number" id="g-vcpa" step="0.01"></div>
+        </div>
+        <button type="button" id="g-calc" style="margin-top:10px;">Calculer la valeur intrinsèque</button>
+      </div>
+
+      <div id="dcf-form" style="display:none;">
+        <div class="form-row">
+          <div><label>FCF actuel (M€)</label><input type="number" id="d-fcf" step="0.1"></div>
+          <div><label>Actions en circulation (M)</label><input type="number" id="d-nbact" step="0.1" min="0.01"></div>
+          <div><label>Croissance FCF (%)</label><input type="number" id="d-croiss" value="8" step="0.5"></div>
+        </div>
+        <div class="form-row">
+          <div><label>Taux d'actualisation (%)</label><input type="number" id="d-taux" value="10" step="0.5"></div>
+          <div><label>Croissance terminale (%)</label><input type="number" id="d-gterm" value="2" step="0.1"></div>
+          <div><label>Années projetées</label><input type="number" id="d-annees" value="10" min="3" max="15" step="1"></div>
+        </div>
+        <button type="button" id="d-calc" style="margin-top:10px;">Calculer la valeur intrinsèque</button>
+      </div>
+
+      <div id="calc-result" style="margin-top:14px;"></div>
+
+      <div id="valorisation-history" style="margin-top:16px;"></div>
+
+      <hr class="divider">
+      <p class="caption">📓 Pour documenter la thèse d'investissement de ce titre, rends-toi sur la page <strong>Journal</strong>.</p>
+    </div>
+  </main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/4.1.1/plotly.min.js"></script>
+<script src="js/db.js"></script>
+<script src="js/score.js"></script>
+<script src="js/alerts.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/charts.js"></script>
+<script src="js/nav.js"></script>
+<script>
+let currentRowId = null;
+
+function renderChecklist(row) {
+  const statuses = checklistStatus(row);
+  document.getElementById("checklist").innerHTML = statuses.map((s) => {
+    if (s.kind === "manuel") {
+      return `<div><label class="checkbox-row"><input type="checkbox" data-key="${s.key}" ${s.value ? "checked" : ""}> ${s.label}</label></div>`;
+    }
+    const icon = s.value === true ? "✅" : s.value === false ? "❌" : "➖";
+    return `<div><p>${icon} <strong>${s.label}</strong> <em>(auto)</em> — <span class="caption">${s.help}</span></p></div>`;
+  }).join("");
+}
+
+function loadTitle(id, keepCalcResult = false) {
+  currentRowId = id;
+  const watchlist = db.fetchWatchlist();
+  const row = watchlist.find((r) => r.id === id);
+  if (!row) return;
+
+  const weights = db.getWeights();
+  const thresholds = db.getThresholds();
+  const result = computeScore(row, weights, thresholds);
+
+  document.getElementById("fh-name").textContent = `${row.ticker} — ${row.nom || ""}`;
+  document.getElementById("fh-sub").textContent = `${row.secteur || "Secteur non renseigné"} · Statut : ${row.statut}`;
+  document.getElementById("fh-score").textContent = result.score !== null ? `${result.score.toFixed(0)}/100` : "N/A";
+  const color = VERDICT_COLORS[result.verdict] || "#898781";
+  document.getElementById("fh-verdict").innerHTML = `<div style="padding:10px 16px;border-radius:8px;background:${color}22;border:1px solid ${color};text-align:center;font-weight:600;color:${color};">${result.verdict}</div>`;
+
+  document.getElementById("fh-coverage").textContent = result.coverage < result.coverageTotal
+    ? `⚠️ Score basé sur ${result.coverage}/${result.coverageTotal} critères (données manquantes exclues du calcul, pas pénalisées).`
+    : "";
+
+  // alerts
+  const portefeuille = db.fetchPortefeuille();
+  const theses = db.fetchTheses();
+  const valorisations = db.fetchValorisations();
+  let alertsThis = watchlistAlerts([row], thresholds);
+  const pfThis = portefeuille.filter((p) => p.ticker === row.ticker);
+  if (pfThis.length) alertsThis = alertsThis.concat(portfolioAlerts(pfThis, watchlist, theses, valorisations, thresholds));
+  const alertsBox = document.getElementById("fh-alerts");
+  alertsBox.innerHTML = alertsThis.length ? `<h2>⚠️ Alertes actives</h2>` + alertsThis.map((a) => `
+    <div class="alert-row">${SEVERITY_ICON[a.severity]} <strong>${a.type}</strong> — <span class="msg">${a.message}</span></div>
+  `).join("") : "";
+
+  // radar + subscores
+  radarChart("radar-chart", [{ name: row.ticker, values: result.subScores, color: "#2a78d6" }]);
+  document.getElementById("subscores").innerHTML = Object.keys(METRIC_LABELS).map((k) => {
+    const label = METRIC_LABELS[k];
+    const sub = result.subScores[k];
+    const raw = result.rawValues[k];
+    if (sub === null) return `<p class="caption"><strong>${label}</strong> — donnée non renseignée</p>`;
+    return `
+      <div style="margin-bottom:10px;">
+        <div style="font-size:13px; margin-bottom:3px;">${label} : ${sub.toFixed(0)}/100 (valeur brute : ${raw})</div>
+        <div style="background:#e9e7e0; border-radius:6px; height:8px;"><div style="width:${sub}%; background:#2a78d6; height:8px; border-radius:6px;"></div></div>
+      </div>`;
+  }).join("");
+
+  renderChecklist(row);
+
+  const hist = db.fetchValorisations(row.ticker);
+  document.getElementById("valorisation-history").innerHTML = hist.length ? `
+    <h3>Historique des calculs pour ce titre</h3>
+    <table><thead><tr><th>Méthode</th><th>Paramètres</th><th>Val. intrinsèque</th><th>Prix</th><th>Marge</th><th>Date</th></tr></thead>
+    <tbody>${hist.map((h) => `<tr><td>${h.methode}</td><td>${h.parametres || ""}</td><td>${Number(h.valeur_intrinseque).toFixed(2)}</td><td>${h.prix_actuel ?? "—"}</td><td>${h.marge_securite !== null && h.marge_securite !== undefined ? Number(h.marge_securite).toFixed(1) + "%" : "—"}</td><td>${h.date_calcul}</td></tr>`).join("")}</tbody></table>
+  ` : "";
+
+  if (!keepCalcResult) document.getElementById("calc-result").innerHTML = "";
+  document.getElementById("g-bpa").dataset.prix = row.prix_actuel ?? 0;
+}
+
+document.getElementById("save-checklist").addEventListener("click", () => {
+  const patch = {};
+  document.querySelectorAll("#checklist input[type=checkbox]").forEach((cb) => {
+    patch[cb.dataset.key] = cb.checked ? 1 : 0;
+  });
+  db.updateWatchlistRow(currentRowId, patch);
+  loadTitle(currentRowId);
+});
+
+document.querySelectorAll('input[name="methode"]').forEach((r) => {
+  r.addEventListener("change", () => {
+    const isDcf = document.querySelector('input[name="methode"]:checked').value === "dcf";
+    document.getElementById("graham-form").style.display = isDcf ? "none" : "block";
+    document.getElementById("dcf-form").style.display = isDcf ? "block" : "none";
+    document.getElementById("calc-result").innerHTML = "";
+  });
+});
+
+document.getElementById("g-calc").addEventListener("click", () => {
+  const bpa = Number(document.getElementById("g-bpa").value);
+  const vcpa = Number(document.getElementById("g-vcpa").value);
+  const box = document.getElementById("calc-result");
+  if (!(bpa > 0) || !(vcpa > 0)) {
+    box.innerHTML = '<div class="error-box">BPA et valeur comptable doivent être positifs.</div>';
+    return;
+  }
+  const watchlist = db.fetchWatchlist();
+  const row = watchlist.find((r) => r.id === currentRowId);
+  const vi = Math.sqrt(22.5 * bpa * vcpa);
+  const prix = row.prix_actuel || 0;
+  const marge = vi && prix ? ((vi - prix) / vi) * 100 : null;
+  box.innerHTML = `
+    <div class="kpi"><div class="label">Valeur intrinsèque</div><div class="value">${vi.toFixed(2)}</div></div>
+    ${marge !== null ? `<div class="kpi" style="margin-top:8px;"><div class="label">Marge de sécurité</div><div class="value">${marge.toFixed(1)}%</div></div>` : ""}
+    <div class="success-box" style="margin-top:10px;">Calcul enregistré — les alertes de portefeuille en tiendront compte.</div>`;
+  db.addValorisation({ ticker: row.ticker, methode: "Graham Number", parametres: `BPA=${bpa}; VCPA=${vcpa}`, valeur_intrinseque: vi, prix_actuel: prix || null, marge_securite: marge });
+  loadTitle(currentRowId, true);
+});
+
+document.getElementById("d-calc").addEventListener("click", () => {
+  const fcf = Number(document.getElementById("d-fcf").value);
+  const nbActions = Number(document.getElementById("d-nbact").value);
+  const croissance = Number(document.getElementById("d-croiss").value);
+  const taux = Number(document.getElementById("d-taux").value);
+  const gTerm = Number(document.getElementById("d-gterm").value);
+  const nbAnnees = Number(document.getElementById("d-annees").value);
+  const box = document.getElementById("calc-result");
+
+  const g = croissance / 100, r = taux / 100, gt = gTerm / 100;
+  if (r <= gt || !(nbActions > 0)) {
+    box.innerHTML = '<div class="error-box">Vérifie que le taux d\'actualisation > croissance terminale et que le nombre d\'actions est positif.</div>';
+    return;
+  }
+  let valeurActualisee = 0, f = fcf;
+  for (let annee = 1; annee <= nbAnnees; annee++) {
+    f *= (1 + g);
+    valeurActualisee += f / Math.pow(1 + r, annee);
+  }
+  const vt = f * (1 + gt) / (r - gt);
+  const vtActualisee = vt / Math.pow(1 + r, nbAnnees);
+  const valeurEntreprise = valeurActualisee + vtActualisee;
+  const vi = valeurEntreprise / nbActions;
+
+  const watchlist = db.fetchWatchlist();
+  const row = watchlist.find((rr) => rr.id === currentRowId);
+  const prix = row.prix_actuel || 0;
+  const marge = vi && prix ? ((vi - prix) / vi) * 100 : null;
+
+  box.innerHTML = `
+    <div class="kpi"><div class="label">Valeur intrinsèque par action</div><div class="value">${vi.toFixed(2)}</div></div>
+    ${marge !== null ? `<div class="kpi" style="margin-top:8px;"><div class="label">Marge de sécurité</div><div class="value">${marge.toFixed(1)}%</div></div>` : ""}
+    <div class="success-box" style="margin-top:10px;">Calcul enregistré — les alertes de portefeuille en tiendront compte.</div>`;
+  db.addValorisation({
+    ticker: row.ticker, methode: "DCF simplifié",
+    parametres: `FCF=${fcf}M; croissance=${croissance}%; taux=${taux}%; g_term=${gTerm}%; annees=${nbAnnees}`,
+    valeur_intrinseque: vi, prix_actuel: prix || null, marge_securite: marge,
+  });
+  loadTitle(currentRowId, true);
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+  const watchlist = db.fetchWatchlist();
+  if (!watchlist.length) {
+    document.getElementById("empty").style.display = "block";
+    return;
+  }
+  document.getElementById("body").style.display = "block";
+  const select = document.getElementById("title-select");
+  select.innerHTML = watchlist.map((r) => `<option value="${r.id}">${r.ticker} — ${r.nom || "sans nom"}</option>`).join("");
+  select.addEventListener("change", () => loadTitle(Number(select.value)));
+  loadTitle(watchlist[0].id);
+});
+</script>
+</body>
+</html>

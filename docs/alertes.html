@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Alertes — ValueBoard</title>
+<link rel="stylesheet" href="css/style.css">
+<script>
+  if (sessionStorage.getItem("valueboard_session") !== "1") { location.href = "login.html"; }
+</script>
+</head>
+<body>
+<div id="layout">
+  <main class="content">
+    <h1>🚨 Alertes</h1>
+    <p class="caption">Vue consolidée de tout ce qui mérite ton attention : opportunités sur la watchlist et signaux de risque sur le portefeuille. Réglable dans la page Réglages.</p>
+
+    <div id="empty" class="success-box" style="display:none;">Aucune alerte active pour le moment.</div>
+
+    <div id="body" style="display:none;">
+      <div class="kpi-row">
+        <div class="kpi"><div class="label">🔴 Critiques</div><div class="value" id="k-critical">0</div></div>
+        <div class="kpi"><div class="label">🟠 À surveiller</div><div class="value" id="k-warning">0</div></div>
+        <div class="kpi"><div class="label">🟢 Opportunités</div><div class="value" id="k-info">0</div></div>
+      </div>
+
+      <hr class="divider">
+      <div class="pill-toggle" id="category-filter"></div>
+
+      <div id="alerts-list"></div>
+    </div>
+  </main>
+</div>
+
+<script src="js/db.js"></script>
+<script src="js/score.js"></script>
+<script src="js/alerts.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/nav.js"></script>
+<script>
+let allAlertsGlobal = [];
+let categoryFilter = ["Watchlist", "Portefeuille"];
+
+function renderList() {
+  const filtered = allAlertsGlobal.filter((a) => categoryFilter.includes(a.categorie));
+  document.getElementById("alerts-list").innerHTML = filtered.map((a) => `
+    <div class="card" style="padding:12px 16px;">
+      <div>${SEVERITY_ICON[a.severity]} <strong>${a.ticker}</strong> — ${a.nom || ""} · <em>${a.type}</em> (${a.categorie})</div>
+      <p class="caption" style="margin:4px 0 0;">${a.message}</p>
+    </div>
+  `).join("");
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  const watchlist = db.fetchWatchlist();
+  const portefeuille = db.fetchPortefeuille();
+  const theses = db.fetchTheses();
+  const valorisations = db.fetchValorisations();
+  const thresholds = db.getThresholds();
+
+  allAlertsGlobal = allAlerts(watchlist, portefeuille, theses, valorisations, thresholds);
+
+  if (!allAlertsGlobal.length) {
+    document.getElementById("empty").style.display = "block";
+    return;
+  }
+  document.getElementById("body").style.display = "block";
+
+  document.getElementById("k-critical").textContent = allAlertsGlobal.filter((a) => a.severity === "critical").length;
+  document.getElementById("k-warning").textContent = allAlertsGlobal.filter((a) => a.severity === "warning").length;
+  document.getElementById("k-info").textContent = allAlertsGlobal.filter((a) => a.severity === "info").length;
+
+  const catEl = document.getElementById("category-filter");
+  catEl.innerHTML = categoryFilter.map((c) => `<label><input type="checkbox" data-cat="${c}" checked> ${c}</label>`).join("");
+  catEl.querySelectorAll("input").forEach((cb) => {
+    cb.addEventListener("change", () => {
+      const c = cb.dataset.cat;
+      if (cb.checked) { if (!categoryFilter.includes(c)) categoryFilter.push(c); }
+      else { categoryFilter = categoryFilter.filter((x) => x !== c); }
+      renderList();
+    });
+  });
+
+  renderList();
+});
+</script>
+</body>
+</html>

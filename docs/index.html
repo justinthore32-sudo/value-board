@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ValueBoard</title>
+<link rel="stylesheet" href="css/style.css">
+<script>
+  if (sessionStorage.getItem("valueboard_session") !== "1") { location.href = "login.html"; }
+</script>
+</head>
+<body>
+<div id="layout">
+  <main class="content">
+    <h1>🧭 ValueBoard</h1>
+    <p class="caption">Un compagnon de décision pour tes recherches Value Investing Screener (VIS) : score, checklist, alertes et comparaison — pour savoir quoi acheter, quand réévaluer, et comment répartir ton capital.</p>
+
+    <div id="empty" style="display:none;">
+      <div class="info-box">Ta watchlist est vide — commence par la page <strong>Watchlist</strong> dans le menu.</div>
+    </div>
+
+    <div id="content-body" style="display:none;">
+      <div class="kpi-row">
+        <div class="kpi"><div class="label">Titres suivis</div><div class="value" id="kpi-titres">0</div></div>
+        <div class="kpi"><div class="label">Achats forts</div><div class="value" id="kpi-forts">0</div></div>
+        <div class="kpi"><div class="label">Positions en portefeuille</div><div class="value" id="kpi-positions">0</div></div>
+        <div class="kpi"><div class="label">Alertes critiques</div><div class="value" id="kpi-critiques">0</div></div>
+      </div>
+
+      <hr class="divider">
+
+      <div class="grid-2">
+        <div>
+          <h2>Répartition des verdicts</h2>
+          <div id="verdict-chart" class="chart-box"></div>
+        </div>
+        <div>
+          <h2>🏆 Meilleurs candidats</h2>
+          <table>
+            <thead><tr><th>Ticker</th><th>Nom</th><th>Score</th><th>Verdict</th></tr></thead>
+            <tbody id="top-candidates"></tbody>
+          </table>
+          <p class="caption" style="margin-top:10px;">Détail sur la page <strong>Fiche Titre</strong>, comparaison sur la page <strong>Comparateur</strong>.</p>
+        </div>
+      </div>
+
+      <hr class="divider">
+
+      <h2>🚨 Alertes prioritaires</h2>
+      <div id="alerts-list"></div>
+      <div id="alerts-empty" class="success-box" style="display:none;">Aucune alerte active pour le moment.</div>
+      <p class="caption" id="alerts-more"></p>
+    </div>
+  </main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/4.1.1/plotly.min.js"></script>
+<script src="js/db.js"></script>
+<script src="js/score.js"></script>
+<script src="js/alerts.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/charts.js"></script>
+<script src="js/nav.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const watchlist = db.fetchWatchlist();
+  if (watchlist.length === 0) {
+    document.getElementById("empty").style.display = "block";
+    return;
+  }
+  document.getElementById("content-body").style.display = "block";
+
+  const portefeuille = db.fetchPortefeuille();
+  const theses = db.fetchTheses();
+  const valorisations = db.fetchValorisations();
+  const weights = db.getWeights();
+  const thresholds = db.getThresholds();
+
+  const scored = watchlist.map((row) => {
+    const r = computeScore(row, weights, thresholds);
+    return { ...row, score: r.score, verdict: r.verdict };
+  });
+
+  const alerts = allAlerts(watchlist, portefeuille, theses, valorisations, thresholds);
+
+  document.getElementById("kpi-titres").textContent = watchlist.length;
+  document.getElementById("kpi-forts").textContent = scored.filter((r) => r.verdict === "Achat fort").length;
+  document.getElementById("kpi-positions").textContent = portefeuille.length;
+  document.getElementById("kpi-critiques").textContent = alerts.filter((a) => a.severity === "critical").length;
+
+  const counts = {};
+  for (const r of scored) counts[r.verdict] = (counts[r.verdict] || 0) + 1;
+  verdictBarChart("verdict-chart", counts);
+
+  const top = [...scored].sort((a, b) => (b.score ?? -1) - (a.score ?? -1)).slice(0, 5);
+  document.getElementById("top-candidates").innerHTML = top.map((r) => `
+    <tr><td>${r.ticker}</td><td>${r.nom || ""}</td><td>${r.score ?? "—"}</td><td>${r.verdict}</td></tr>
+  `).join("");
+
+  const alertsList = document.getElementById("alerts-list");
+  if (alerts.length === 0) {
+    document.getElementById("alerts-empty").style.display = "block";
+  } else {
+    alertsList.innerHTML = alerts.slice(0, 5).map((a) => `
+      <div class="alert-row">${SEVERITY_ICON[a.severity]} <strong>${a.ticker}</strong> — <em>${a.type}</em> : <span class="msg">${a.message}</span></div>
+    `).join("");
+    if (alerts.length > 5) {
+      document.getElementById("alerts-more").textContent = `+ ${alerts.length - 5} autre(s) alerte(s) — voir la page Alertes.`;
+    }
+  }
+});
+</script>
+</body>
+</html>

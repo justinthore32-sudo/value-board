@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Réglages — ValueBoard</title>
+<link rel="stylesheet" href="css/style.css">
+<script>
+  if (sessionStorage.getItem("valueboard_session") !== "1") { location.href = "login.html"; }
+</script>
+</head>
+<body>
+<div id="layout">
+  <main class="content">
+    <h1>⚙️ Réglages</h1>
+    <p class="caption">Le score composite et les alertes sont entièrement pilotés par ces réglages. Les valeurs par défaut s'inspirent de repères classiques du value investing (Graham, Piotroski, Altman) mais rien n'est figé : ajuste-les selon ta propre méthode.</p>
+
+    <div class="card">
+      <h2 style="margin-top:0;">Pondération du score composite</h2>
+      <p class="caption">Chaque critère pèse dans le score final proportionnellement à son curseur. Mets un critère à 0 pour l'exclure complètement. Si une donnée est absente pour un titre, son poids est automatiquement retiré du calcul.</p>
+      <div id="weights-sliders"></div>
+      <p class="caption">Somme actuelle des poids : <strong id="weights-sum"></strong> (n'a pas besoin de faire 100 — c'est relatif).</p>
+      <button type="button" id="save-weights">Enregistrer la pondération</button>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-top:0;">Seuils du verdict</h2>
+      <div class="form-row">
+        <div><label>Score minimum pour "Achat fort"</label><input type="number" id="s-achat-fort" min="0" max="100" step="1"></div>
+        <div><label>Score minimum pour "À surveiller"</label><input type="number" id="s-surveiller" min="0" max="100" step="1"></div>
+      </div>
+      <div id="verdict-error"></div>
+      <button type="button" id="save-verdict" style="margin-top:10px;">Enregistrer les seuils de verdict</button>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-top:0;">Seuils d'alerte</h2>
+      <p class="caption">Ces seuils déclenchent les badges sur la Watchlist, le Portefeuille et la page Alertes.</p>
+      <div class="form-row">
+        <div><label>Marge de sécurité déclenchant "Opportunité" (%)</label><input type="number" id="t-marge" min="0" step="1"></div>
+        <div><label>F-Score en dessous duquel "Qualité faible" (0-9)</label><input type="number" id="t-fscore" min="0" max="9" step="1"></div>
+      </div>
+      <div class="form-row">
+        <div><label>Dette/EBITDA au-dessus de laquelle "Dette élevée"</label><input type="number" id="t-dette" min="0" step="0.5"></div>
+        <div><label>Z-Score en dessous duquel "Détresse financière"</label><input type="number" id="t-zdetresse" min="0" step="0.05"></div>
+      </div>
+      <div><label>Z-Score au-dessus duquel la zone est "saine"</label><input type="number" id="t-zsain" min="0" step="0.05"></div>
+      <button type="button" id="save-thresholds" style="margin-top:14px;">Enregistrer les seuils d'alerte</button>
+    </div>
+
+    <button type="button" id="reset-btn" class="btn-secondary">↩️ Réinitialiser tous les réglages par défaut</button>
+
+    <hr class="divider">
+    <div class="warning-box">⚠️ Rappel : cette version de ValueBoard est un site statique (GitHub Pages) — la protection par mot de passe est un simple verrou côté navigateur, pas un vrai contrôle d'accès serveur, et les données ne sont pas synchronisées entre tes appareils.</div>
+  </main>
+</div>
+
+<script src="js/db.js"></script>
+<script src="js/score.js"></script>
+<script src="js/alerts.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/nav.js"></script>
+<script>
+function renderWeights() {
+  const weights = db.getWeights();
+  const el = document.getElementById("weights-sliders");
+  el.innerHTML = Object.keys(METRIC_LABELS).map((k) => `
+    <div class="slider-row">
+      <label>${METRIC_LABELS[k]} <output id="out-${k}">${weights[k]}</output></label>
+      <input type="range" min="0" max="50" step="1" value="${weights[k]}" data-key="${k}">
+    </div>
+  `).join("");
+  el.querySelectorAll("input[type=range]").forEach((input) => {
+    input.addEventListener("input", () => {
+      document.getElementById(`out-${input.dataset.key}`).textContent = input.value;
+      updateSum();
+    });
+  });
+  updateSum();
+}
+
+function updateSum() {
+  let sum = 0;
+  document.querySelectorAll("#weights-sliders input[type=range]").forEach((i) => { sum += Number(i.value); });
+  document.getElementById("weights-sum").textContent = sum;
+}
+
+function renderThresholds() {
+  const t = db.getThresholds();
+  document.getElementById("s-achat-fort").value = t.verdict_achat_fort;
+  document.getElementById("s-surveiller").value = t.verdict_surveiller;
+  document.getElementById("t-marge").value = t.marge_securite_opportunite;
+  document.getElementById("t-fscore").value = t.f_score_alerte;
+  document.getElementById("t-dette").value = t.dette_ebitda_alerte;
+  document.getElementById("t-zdetresse").value = t.z_score_detresse;
+  document.getElementById("t-zsain").value = t.z_score_sain;
+}
+
+document.getElementById("save-weights").addEventListener("click", () => {
+  const weights = {};
+  document.querySelectorAll("#weights-sliders input[type=range]").forEach((i) => { weights[i.dataset.key] = Number(i.value); });
+  db.setSetting("weights", weights);
+  alert("Pondération mise à jour.");
+});
+
+document.getElementById("save-verdict").addEventListener("click", () => {
+  const achatFort = Number(document.getElementById("s-achat-fort").value);
+  const surveiller = Number(document.getElementById("s-surveiller").value);
+  const errBox = document.getElementById("verdict-error");
+  if (surveiller >= achatFort) {
+    errBox.innerHTML = '<div class="error-box">Le seuil "À surveiller" doit être inférieur au seuil "Achat fort".</div>';
+    return;
+  }
+  errBox.innerHTML = "";
+  const t = db.getThresholds();
+  t.verdict_achat_fort = achatFort;
+  t.verdict_surveiller = surveiller;
+  db.setSetting("thresholds", t);
+  alert("Seuils de verdict mis à jour.");
+});
+
+document.getElementById("save-thresholds").addEventListener("click", () => {
+  const t = db.getThresholds();
+  t.marge_securite_opportunite = Number(document.getElementById("t-marge").value);
+  t.f_score_alerte = Number(document.getElementById("t-fscore").value);
+  t.dette_ebitda_alerte = Number(document.getElementById("t-dette").value);
+  t.z_score_detresse = Number(document.getElementById("t-zdetresse").value);
+  t.z_score_sain = Number(document.getElementById("t-zsain").value);
+  db.setSetting("thresholds", t);
+  alert("Seuils d'alerte mis à jour.");
+});
+
+document.getElementById("reset-btn").addEventListener("click", () => {
+  db.resetSettings();
+  renderWeights();
+  renderThresholds();
+  alert("Réglages réinitialisés aux valeurs par défaut.");
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+  renderWeights();
+  renderThresholds();
+});
+</script>
+</body>
+</html>

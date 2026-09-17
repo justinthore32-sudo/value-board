@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Journal — ValueBoard</title>
+<link rel="stylesheet" href="css/style.css">
+<script>
+  if (sessionStorage.getItem("valueboard_session") !== "1") { location.href = "login.html"; }
+</script>
+</head>
+<body>
+<div id="layout">
+  <main class="content">
+    <h1>📓 Journal de thèse d'investissement</h1>
+    <p class="caption">Avant d'investir, écris ta thèse noir sur blanc. La date de revue alimente les alertes du portefeuille (page Alertes / Portefeuille).</p>
+
+    <div id="no-watchlist" class="warning-box" style="display:none;">Ajoute d'abord des titres dans la <strong>Watchlist</strong> avant de rédiger une thèse.</div>
+
+    <div id="form-card" class="card" style="display:none;">
+      <h2 style="margin-top:0;">➕ Nouvelle thèse</h2>
+      <form id="add-form">
+        <label>Titre concerné</label>
+        <select id="f-titre"></select>
+        <label>Thèse d'investissement</label>
+        <textarea id="f-these" placeholder="Pourquoi ce titre est-il sous-évalué ? Quel est le catalyseur de réévaluation ?"></textarea>
+        <label>Catalyseurs attendus</label>
+        <textarea id="f-catalyseurs"></textarea>
+        <label>Risques identifiés</label>
+        <textarea id="f-risques"></textarea>
+        <label>Date de revue prévue</label>
+        <input type="date" id="f-date-revue">
+        <button type="submit" style="margin-top:14px;">Enregistrer la thèse</button>
+      </form>
+    </div>
+
+    <hr class="divider">
+    <h2>Thèses enregistrées</h2>
+    <div id="empty" class="info-box" style="display:none;">Aucune thèse enregistrée pour l'instant.</div>
+    <div id="theses-list"></div>
+  </main>
+</div>
+
+<script src="js/db.js"></script>
+<script src="js/score.js"></script>
+<script src="js/alerts.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/nav.js"></script>
+<script>
+function refresh() {
+  const watchlist = db.fetchWatchlist();
+  document.getElementById("no-watchlist").style.display = watchlist.length ? "none" : "block";
+  document.getElementById("form-card").style.display = watchlist.length ? "block" : "none";
+  if (watchlist.length) {
+    document.getElementById("f-titre").innerHTML = watchlist.map((r) => `<option value="${r.id}">${r.ticker} — ${r.nom || "sans nom"}</option>`).join("");
+  }
+
+  const theses = db.fetchTheses();
+  document.getElementById("empty").style.display = theses.length ? "none" : "block";
+  document.getElementById("theses-list").innerHTML = theses.map((t) => `
+    <div class="card">
+      <div style="display:flex; justify-content:space-between;">
+        <h3 style="margin:0;">${t.ticker} — ${t.nom || ""}</h3>
+        <span class="caption">Rédigée le ${t.date_creation}</span>
+      </div>
+      <p><strong>Thèse :</strong> ${t.these || "—"}</p>
+      <p><strong>Catalyseurs :</strong> ${t.catalyseurs || "—"}</p>
+      <p><strong>Risques :</strong> ${t.risques || "—"}</p>
+      <p><strong>Revue prévue le :</strong> ${t.date_revue || "—"}</p>
+      <button type="button" class="btn-danger" data-id="${t.id}">🗑️ Supprimer cette thèse</button>
+    </div>
+  `).join("");
+  document.querySelectorAll("#theses-list [data-id]").forEach((btn) => {
+    btn.addEventListener("click", () => { db.deleteThese(Number(btn.dataset.id)); refresh(); });
+  });
+}
+
+document.getElementById("add-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const watchlistId = Number(document.getElementById("f-titre").value);
+  db.addThese({
+    watchlist_id: watchlistId,
+    these: document.getElementById("f-these").value,
+    catalyseurs: document.getElementById("f-catalyseurs").value,
+    risques: document.getElementById("f-risques").value,
+    date_revue: document.getElementById("f-date-revue").value,
+  });
+  e.target.reset();
+  refresh();
+});
+
+document.addEventListener("DOMContentLoaded", refresh);
+</script>
+</body>
+</html>

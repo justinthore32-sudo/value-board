@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Connexion — ValueBoard</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="login-wrap">
+  <div class="login-card">
+    <h1>🧭 ValueBoard</h1>
+    <p class="caption">Tableau de bord d'aide à la décision pour le value investing</p>
+
+    <div id="warning-box" class="warning-box" style="margin-bottom:16px; font-size:13px;">
+      ⚠️ Verrou basique côté navigateur — pas un vrai contrôle d'accès serveur
+      (le code est public). Les identifiants et les données sont propres à cet
+      appareil/navigateur, pas synchronisés ailleurs.
+    </div>
+
+    <div id="create-mode">
+      <p class="caption" style="margin-bottom:8px;">Première utilisation sur cet appareil : crée un nom d'utilisateur et un mot de passe.</p>
+      <form id="create-form">
+        <label for="c-username">Nom d'utilisateur</label>
+        <input type="text" id="c-username" required>
+        <label for="c-password">Mot de passe</label>
+        <input type="password" id="c-password" required>
+        <label for="c-password2">Confirme le mot de passe</label>
+        <input type="password" id="c-password2" required>
+        <div id="create-error"></div>
+        <button type="submit" style="width:100%; margin-top:16px;">Créer et se connecter</button>
+      </form>
+    </div>
+
+    <div id="login-mode" style="display:none;">
+      <form id="login-form">
+        <label for="l-username">Nom d'utilisateur</label>
+        <input type="text" id="l-username" required>
+        <label for="l-password">Mot de passe</label>
+        <input type="password" id="l-password" required>
+        <div id="login-error"></div>
+        <button type="submit" style="width:100%; margin-top:16px;">Se connecter</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script src="js/auth.js"></script>
+<script>
+  const cfg = getAuthConfig();
+  document.getElementById("create-mode").style.display = cfg ? "none" : "block";
+  document.getElementById("login-mode").style.display = cfg ? "block" : "none";
+
+  document.getElementById("create-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const username = document.getElementById("c-username").value.trim();
+    const password = document.getElementById("c-password").value;
+    const password2 = document.getElementById("c-password2").value;
+    const errorBox = document.getElementById("create-error");
+    errorBox.innerHTML = "";
+
+    if (!username || !password) {
+      errorBox.innerHTML = '<div class="error-box" style="margin-top:10px;">Nom d\'utilisateur et mot de passe obligatoires.</div>';
+      return;
+    }
+    if (password !== password2) {
+      errorBox.innerHTML = '<div class="error-box" style="margin-top:10px;">Les deux mots de passe ne correspondent pas.</div>';
+      return;
+    }
+    await setCredentials(username, password);
+    setAuthenticated();
+    window.location.href = "index.html";
+  });
+
+  document.getElementById("login-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const username = document.getElementById("l-username").value.trim();
+    const password = document.getElementById("l-password").value;
+    const errorBox = document.getElementById("login-error");
+    errorBox.innerHTML = "";
+
+    const ok = await checkCredentials(username, password);
+    if (ok) {
+      setAuthenticated();
+      window.location.href = "index.html";
+    } else {
+      errorBox.innerHTML = '<div class="error-box" style="margin-top:10px;">Nom d\'utilisateur ou mot de passe incorrect.</div>';
+    }
+  });
+</script>
+</body>
+</html>

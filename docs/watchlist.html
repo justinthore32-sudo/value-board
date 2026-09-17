@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Watchlist — ValueBoard</title>
+<link rel="stylesheet" href="css/style.css">
+<script>
+  if (sessionStorage.getItem("valueboard_session") !== "1") { location.href = "login.html"; }
+</script>
+</head>
+<body>
+<div id="layout">
+  <main class="content">
+    <h1>🔎 Watchlist</h1>
+    <p class="caption">Centralise ici les titres repérés dans VIS avec leurs métriques clés. Le score et le verdict sont recalculés automatiquement selon tes réglages.</p>
+
+    <div class="card">
+      <h2 style="margin-top:0;">➕ Ajouter un titre</h2>
+      <form id="add-form">
+        <div class="form-row">
+          <div><label>Ticker *</label><input type="text" id="f-ticker" placeholder="ex. MC.PA" required></div>
+          <div><label>Nom de l'entreprise</label><input type="text" id="f-nom"></div>
+          <div><label>Secteur</label><input type="text" id="f-secteur"></div>
+        </div>
+        <div class="form-row">
+          <div><label>Statut</label>
+            <select id="f-statut">
+              <option>À surveiller</option><option>Analyse en cours</option><option>Acheté</option><option>Rejeté</option>
+            </select>
+          </div>
+          <div><label>Prix actuel</label><input type="number" id="f-prix" step="0.01"></div>
+          <div><label>Devise</label><input type="text" id="f-devise" value="EUR"></div>
+        </div>
+
+        <h3>Métriques issues de VIS</h3>
+        <div class="form-row">
+          <div><label>PER</label><input type="number" id="f-per" step="0.01"></div>
+          <div><label>P/B</label><input type="number" id="f-pb" step="0.01"></div>
+          <div><label>P/CF</label><input type="number" id="f-pcf" step="0.01"></div>
+          <div><label>Rdt dividende (%)</label><input type="number" id="f-dividende" step="0.01"></div>
+        </div>
+        <div class="form-row">
+          <div><label>Dette/EBITDA</label><input type="number" id="f-dette" step="0.01"></div>
+          <div><label>ROE (%)</label><input type="number" id="f-roe" step="0.01"></div>
+          <div><label>Piotroski F-Score</label><input type="number" id="f-fscore" min="0" max="9" step="1"></div>
+          <div><label>Altman Z-Score</label><input type="number" id="f-zscore" step="0.01"></div>
+        </div>
+        <div class="form-row">
+          <div><label>Marge de sécurité VIS (%)</label><input type="number" id="f-marge" step="0.01"></div>
+          <div><label>Croissance estimée (%/an)</label><input type="number" id="f-croissance" step="0.01"></div>
+        </div>
+
+        <h3>Checklist Graham (critères qualitatifs)</h3>
+        <div class="pill-toggle">
+          <label><input type="checkbox" id="f-taille"> Taille adéquate</label>
+          <label><input type="checkbox" id="f-bilan"> Bilan solide</label>
+          <label><input type="checkbox" id="f-benefices"> Bénéfices stables</label>
+          <label><input type="checkbox" id="f-dividende-cont"> Dividende continu</label>
+          <label><input type="checkbox" id="f-croissance-benef"> Croissance bénéfices</label>
+        </div>
+
+        <label>Notes</label>
+        <textarea id="f-notes"></textarea>
+
+        <button type="submit" style="margin-top:14px;">Ajouter à la watchlist</button>
+      </form>
+    </div>
+
+    <div id="empty" class="info-box" style="display:none;">Aucun titre pour l'instant. Ajoute ton premier candidat ci-dessus.</div>
+
+    <div id="list-body" style="display:none;">
+      <h2 id="count-heading"></h2>
+
+      <div class="pill-toggle" id="status-filter"></div>
+
+      <table>
+        <thead><tr>
+          <th>Ticker</th><th>Nom</th><th>Secteur</th><th>Statut</th><th>Score</th><th>Verdict</th><th>Checklist</th><th>Alertes</th><th>MAJ</th>
+        </tr></thead>
+        <tbody id="watchlist-table"></tbody>
+      </table>
+      <p class="caption" style="margin-top:10px;">💡 Pour l'analyse détaillée d'un titre (radar, checklist complète, calculateur), va sur la page <strong>Fiche Titre</strong>.</p>
+
+      <hr class="divider">
+      <h2>✏️ Modifier / supprimer un titre</h2>
+      <label>Sélectionner un titre</label>
+      <select id="edit-select"></select>
+      <form id="edit-form">
+        <div class="form-row">
+          <div><label>Statut</label>
+            <select id="e-statut">
+              <option>À surveiller</option><option>Analyse en cours</option><option>Acheté</option><option>Rejeté</option>
+            </select>
+          </div>
+          <div><label>Prix actuel</label><input type="number" id="e-prix" step="0.01"></div>
+        </div>
+        <label>Notes</label>
+        <textarea id="e-notes"></textarea>
+        <div style="margin-top:12px; display:flex; gap:10px;">
+          <button type="submit">Enregistrer les modifications</button>
+          <button type="button" class="btn-danger" id="delete-btn">🗑️ Supprimer ce titre</button>
+        </div>
+      </form>
+
+      <hr class="divider">
+      <button type="button" class="btn-secondary" id="export-btn">⬇️ Exporter la watchlist (avec score) en CSV</button>
+    </div>
+  </main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/4.1.1/plotly.min.js"></script>
+<script src="js/db.js"></script>
+<script src="js/score.js"></script>
+<script src="js/alerts.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/charts.js"></script>
+<script src="js/nav.js"></script>
+<script>
+let statusFilterState = [...STATUTS];
+
+function numOrNull(v) { return v === "" || v === null ? null : Number(v); }
+
+function refresh() {
+  const df = db.fetchWatchlist();
+  document.getElementById("empty").style.display = df.length ? "none" : "block";
+  document.getElementById("list-body").style.display = df.length ? "block" : "none";
+  if (!df.length) return;
+
+  const weights = db.getWeights();
+  const thresholds = db.getThresholds();
+  const wlAlerts = watchlistAlerts(df, thresholds);
+  const alertCounts = {};
+  for (const a of wlAlerts) alertCounts[a.ticker] = (alertCounts[a.ticker] || 0) + 1;
+
+  const scored = df.map((row) => {
+    const r = computeScore(row, weights, thresholds);
+    const [passed, known] = checklistPassRate(row);
+    return { ...row, score: r.score, verdict: r.verdict, checklistTxt: known ? `${passed}/${known}` : "—", alertes: alertCounts[row.ticker] || 0 };
+  });
+
+  document.getElementById("count-heading").textContent = `${scored.length} titre(s) suivi(s)`;
+
+  // filter pills
+  const filterEl = document.getElementById("status-filter");
+  filterEl.innerHTML = STATUTS.map((s) => `
+    <label><input type="checkbox" data-statut="${s}" ${statusFilterState.includes(s) ? "checked" : ""}> ${s}</label>
+  `).join("");
+  filterEl.querySelectorAll("input").forEach((cb) => {
+    cb.addEventListener("change", () => {
+      const s = cb.dataset.statut;
+      if (cb.checked) { if (!statusFilterState.includes(s)) statusFilterState.push(s); }
+      else { statusFilterState = statusFilterState.filter((x) => x !== s); }
+      renderTable(scored);
+    });
+  });
+
+  renderTable(scored);
+
+  // edit select
+  const select = document.getElementById("edit-select");
+  select.innerHTML = df.map((r) => `<option value="${r.id}">${r.ticker} — ${r.nom || "sans nom"}</option>`).join("");
+  const fillEdit = () => {
+    const row = df.find((r) => r.id === Number(select.value));
+    if (!row) return;
+    document.getElementById("e-statut").value = row.statut;
+    document.getElementById("e-prix").value = row.prix_actuel ?? "";
+    document.getElementById("e-notes").value = row.notes || "";
+  };
+  select.onchange = fillEdit;
+  fillEdit();
+
+  window._scoredWatchlist = scored;
+}
+
+function renderTable(scored) {
+  const filtered = scored.filter((r) => statusFilterState.includes(r.statut))
+    .sort((a, b) => (b.score ?? -1) - (a.score ?? -1));
+  document.getElementById("watchlist-table").innerHTML = filtered.map((r) => `
+    <tr>
+      <td>${r.ticker}</td><td>${r.nom || ""}</td><td>${r.secteur || ""}</td><td>${r.statut}</td>
+      <td>${r.score ?? "—"}</td><td>${r.verdict}</td><td>${r.checklistTxt}</td>
+      <td>${r.alertes ? "⚠️ " + r.alertes : "—"}</td><td>${r.date_maj || ""}</td>
+    </tr>
+  `).join("");
+}
+
+document.getElementById("add-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const ticker = document.getElementById("f-ticker").value.trim().toUpperCase();
+  if (!ticker) return;
+  db.addWatchlistRow({
+    ticker, nom: document.getElementById("f-nom").value, secteur: document.getElementById("f-secteur").value,
+    statut: document.getElementById("f-statut").value,
+    prix_actuel: numOrNull(document.getElementById("f-prix").value),
+    devise: document.getElementById("f-devise").value || "EUR",
+    per: numOrNull(document.getElementById("f-per").value),
+    pb: numOrNull(document.getElementById("f-pb").value),
+    pcf: numOrNull(document.getElementById("f-pcf").value),
+    rendement_dividende: numOrNull(document.getElementById("f-dividende").value),
+    dette_ebitda: numOrNull(document.getElementById("f-dette").value),
+    roe: numOrNull(document.getElementById("f-roe").value),
+    f_score: numOrNull(document.getElementById("f-fscore").value),
+    z_score: numOrNull(document.getElementById("f-zscore").value),
+    marge_securite_vis: numOrNull(document.getElementById("f-marge").value),
+    croissance_estimee: numOrNull(document.getElementById("f-croissance").value),
+    taille_ok: document.getElementById("f-taille").checked ? 1 : 0,
+    bilan_solide: document.getElementById("f-bilan").checked ? 1 : 0,
+    benefices_stables: document.getElementById("f-benefices").checked ? 1 : 0,
+    dividende_continu: document.getElementById("f-dividende-cont").checked ? 1 : 0,
+    croissance_benefices: document.getElementById("f-croissance-benef").checked ? 1 : 0,
+    notes: document.getElementById("f-notes").value,
+  });
+  e.target.reset();
+  document.getElementById("f-devise").value = "EUR";
+  refresh();
+});
+
+document.getElementById("edit-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const id = Number(document.getElementById("edit-select").value);
+  db.updateWatchlistRow(id, {
+    statut: document.getElementById("e-statut").value,
+    prix_actuel: numOrNull(document.getElementById("e-prix").value),
+    notes: document.getElementById("e-notes").value,
+  });
+  refresh();
+});
+
+document.getElementById("delete-btn").addEventListener("click", () => {
+  const id = Number(document.getElementById("edit-select").value);
+  db.deleteWatchlistRow(id);
+  refresh();
+});
+
+document.getElementById("export-btn").addEventListener("click", () => {
+  const scored = window._scoredWatchlist || [];
+  const cols = ["ticker", "nom", "secteur", "statut", "prix_actuel", "devise", "per", "pb", "pcf",
+    "rendement_dividende", "dette_ebitda", "roe", "f_score", "z_score", "marge_securite_vis",
+    "croissance_estimee", "notes", "date_maj", "score", "verdict"];
+  const header = cols.join(",");
+  const rows = scored.map((r) => cols.map((c) => {
+    const v = r[c] ?? "";
+    const s = String(v).replace(/"/g, '""');
+    return /[,"\n]/.test(s) ? `"${s}"` : s;
+  }).join(","));
+  const csv = [header, ...rows].join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = "watchlist.csv";
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
+
+document.addEventListener("DOMContentLoaded", refresh);
+</script>
+</body>
+</html>
