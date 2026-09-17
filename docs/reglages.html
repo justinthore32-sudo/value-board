@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Réglages — ValueBoard</title>
 <link rel="stylesheet" href="css/style.css">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#2a78d6">
 <script>
   if (!localStorage.getItem("valueboard_token")) { location.href = "login.html"; }
 </script>
@@ -49,6 +54,11 @@
     </div>
 
     <button type="button" id="reset-btn" class="btn-secondary">↩️ Réinitialiser tous les réglages par défaut</button>
+
+    <hr class="divider">
+    <h2>Sauvegarde</h2>
+    <p class="caption">Un filet de sécurité : télécharge une copie complète de tes données (watchlist, portefeuille, thèses, réglages) au format JSON.</p>
+    <button type="button" id="export-json-btn" class="btn-secondary">⬇️ Exporter toutes les données (JSON)</button>
   </main>
 </div>
 
@@ -57,6 +67,7 @@
 <script src="js/score.js"></script>
 <script src="js/alerts.js"></script>
 <script src="js/auth.js"></script>
+<script src="js/ui.js"></script>
 <script src="js/nav.js"></script>
 <script>
 function renderWeights() {
@@ -98,7 +109,7 @@ document.getElementById("save-weights").addEventListener("click", () => {
   const weights = {};
   document.querySelectorAll("#weights-sliders input[type=range]").forEach((i) => { weights[i.dataset.key] = Number(i.value); });
   db.setSetting("weights", weights);
-  alert("Pondération mise à jour.");
+  showToast("Pondération mise à jour.", "success");
 });
 
 document.getElementById("save-verdict").addEventListener("click", () => {
@@ -114,7 +125,7 @@ document.getElementById("save-verdict").addEventListener("click", () => {
   t.verdict_achat_fort = achatFort;
   t.verdict_surveiller = surveiller;
   db.setSetting("thresholds", t);
-  alert("Seuils de verdict mis à jour.");
+  showToast("Seuils de verdict mis à jour.", "success");
 });
 
 document.getElementById("save-thresholds").addEventListener("click", () => {
@@ -125,23 +136,39 @@ document.getElementById("save-thresholds").addEventListener("click", () => {
   t.z_score_detresse = Number(document.getElementById("t-zdetresse").value);
   t.z_score_sain = Number(document.getElementById("t-zsain").value);
   db.setSetting("thresholds", t);
-  alert("Seuils d'alerte mis à jour.");
+  showToast("Seuils d'alerte mis à jour.", "success");
 });
 
 document.getElementById("reset-btn").addEventListener("click", () => {
   db.resetSettings();
   renderWeights();
   renderThresholds();
-  alert("Réglages réinitialisés aux valeurs par défaut.");
+  showToast("Réglages réinitialisés aux valeurs par défaut.", "success");
+});
+
+document.getElementById("export-json-btn").addEventListener("click", () => {
+  const data = db.exportAll();
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `valueboard-export-${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast("Export téléchargé.", "success");
 });
 
 document.addEventListener("DOMContentLoaded", async () => {
+  showLoading();
   try {
     await db.sync();
   } catch (err) {
     window.location.href = "login.html";
     return;
   }
+  hideLoading();
   renderWeights();
   renderThresholds();
 });

@@ -38,6 +38,38 @@ body {
 
 .sidebar-links { display: flex; flex-direction: column; gap: 2px; }
 
+.mobile-toggle { display: none; }
+
+@media (max-width: 700px) {
+  #layout { flex-direction: column; }
+
+  .mobile-toggle {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: var(--sidebar-bg);
+    border: none;
+    border-bottom: 1px solid var(--border);
+    padding: 14px 16px;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  .sidebar {
+    width: 100%;
+    flex-shrink: 1;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    display: none;
+  }
+  .sidebar.open { display: flex; }
+
+  .content { padding: 18px; }
+
+  table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; white-space: nowrap; max-width: 100%; }
+}
+
 .nav-link {
   display: block;
   padding: 9px 10px;

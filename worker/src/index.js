@@ -174,12 +174,24 @@ async function handleGetData(request, env) {
   return jsonResponse(data, env);
 }
 
+const MAX_DATA_BYTES = 2 * 1024 * 1024; // 2 Mo — largement suffisant pour un usage perso, évite un KV qui gonfle sans limite
+
 async function handlePutData(request, env) {
-  const body = await request.json();
+  const raw = await request.text();
+  if (raw.length > MAX_DATA_BYTES) {
+    return jsonResponse({ error: `Données trop volumineuses (max ${MAX_DATA_BYTES / 1024 / 1024} Mo).` }, env, 413);
+  }
+
+  let body;
+  try {
+    body = JSON.parse(raw);
+  } catch (e) {
+    return jsonResponse({ error: 'JSON invalide' }, env, 400);
+  }
   if (typeof body !== 'object' || body === null) {
     return jsonResponse({ error: 'Format invalide' }, env, 400);
   }
-  await env.STORE.put('data', JSON.stringify(body));
+  await env.STORE.put('data', raw);
   return jsonResponse({ ok: true }, env);
 }
 

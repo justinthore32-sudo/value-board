@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Fiche Titre — ValueBoard</title>
 <link rel="stylesheet" href="css/style.css">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#2a78d6">
 <script>
   if (!localStorage.getItem("valueboard_token")) { location.href = "login.html"; }
 </script>
@@ -101,6 +106,7 @@
 <script src="js/alerts.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/charts.js"></script>
+<script src="js/ui.js"></script>
 <script src="js/nav.js"></script>
 <script>
 let currentRowId = null;
@@ -256,12 +262,14 @@ document.getElementById("d-calc").addEventListener("click", () => {
 });
 
 document.addEventListener("DOMContentLoaded", async () => {
+  showLoading();
   try {
     await db.sync();
   } catch (err) {
     window.location.href = "login.html";
     return;
   }
+  hideLoading();
   const watchlist = db.fetchWatchlist();
   if (!watchlist.length) {
     document.getElementById("empty").style.display = "block";

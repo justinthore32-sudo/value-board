@@ -1,0 +1,7 @@
+{
+  "name": "value-board-docs",
+  "private": true,
+  "scripts": {
+    "test": "node --test js/*.test.js"
+  }
+}

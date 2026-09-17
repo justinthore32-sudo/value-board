@@ -127,3 +127,11 @@ function checklistPassRate(row) {
   const passed = known.filter((s) => s.value === true);
   return [passed.length, known.length];
 }
+
+if (typeof module !== "undefined") {
+  module.exports = {
+    METRIC_LABELS, VERDICT_COLORS, CHECKLIST_ITEMS,
+    clip, isNum, normalizeMetric, computeScore, verdictLabel,
+    checklistStatus, checklistPassRate,
+  };
+}

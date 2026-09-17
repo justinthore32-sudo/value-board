@@ -168,4 +168,9 @@ const db = {
     _cache.settings = { weights: { ...DEFAULT_WEIGHTS }, thresholds: { ...DEFAULT_THRESHOLDS } };
     _persist();
   },
+
+  // ------------------------------------------------------------------ export
+  exportAll() {
+    return JSON.parse(JSON.stringify(_cache));
+  },
 };

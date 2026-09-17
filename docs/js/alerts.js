@@ -86,3 +86,7 @@ function allAlerts(watchlist, portefeuille, theses, valorisations, thresholds) {
   items.sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]);
   return items;
 }
+
+if (typeof module !== "undefined") {
+  module.exports = { SEVERITY_ORDER, SEVERITY_ICON, watchlistAlerts, portfolioAlerts, allAlerts };
+}

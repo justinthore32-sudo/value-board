@@ -31,8 +31,15 @@ function renderNav() {
     </div>
   `;
 
+  const toggle = document.createElement("button");
+  toggle.type = "button";
+  toggle.className = "mobile-toggle";
+  toggle.textContent = "☰ Menu";
+  toggle.addEventListener("click", () => nav.classList.toggle("open"));
+
   const layout = document.getElementById("layout");
   layout.prepend(nav);
+  layout.prepend(toggle);
   document.getElementById("logout-btn").addEventListener("click", logout);
 
   window.addEventListener("valueboard-sync-error", (e) => {
