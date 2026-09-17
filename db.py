@@ -39,7 +39,6 @@ DEFAULT_THRESHOLDS = {
     "z_score_sain": 2.99,
     "verdict_achat_fort": 75.0,           # score >= : "Achat fort"
     "verdict_surveiller": 50.0,           # score >= : "À surveiller"
-    "delai_revue_jours": 0,               # 0 = alerte dès que la date de revue est dépassée
 }
 
 DEFAULT_CHECKLIST_WEIGHT = 0  # poids du taux de réussite checklist dans le score (0 = non inclus)

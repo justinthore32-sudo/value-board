@@ -116,6 +116,20 @@ value-board/
 └── .gitignore
 ```
 
+## Tests
+
+Le harnais officiel `streamlit.testing.v1.AppTest` couvre `app.py` et chaque
+page, en base vide puis avec un jeu de données couvrant : un titre "Achat
+fort" complet, un titre avec métriques manquantes, un titre en détresse
+financière, une position avec objectif de prix atteint, une thèse en retard
+de revue. Des tests unitaires couvrent aussi le moteur de scoring et les 6
+types d'alertes indépendamment de Streamlit.
+
+```bash
+pip install -r requirements-dev.txt
+pytest
+```
+
 ## Limites et avertissements
 
 - Cet outil ne fournit **aucun conseil en investissement**. Le score, la
