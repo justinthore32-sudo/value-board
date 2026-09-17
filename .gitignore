@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+data/value_board.db
+.streamlit/secrets.toml
+.DS_Store
