@@ -83,7 +83,7 @@ with col_left:
         height=260,
         showlegend=False,
     )
-    st.plotly_chart(fig, width="stretch")
+    st.plotly_chart(fig)
 
 with col_right:
     st.subheader("🏆 Meilleurs candidats")

@@ -106,7 +106,7 @@ with col_radar:
         margin=dict(l=40, r=40, t=20, b=20),
         height=380,
     )
-    st.plotly_chart(fig, width="stretch")
+    st.plotly_chart(fig)
 
 with col_detail:
     st.subheader("Détail des sous-scores")

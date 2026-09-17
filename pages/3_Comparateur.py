@@ -73,7 +73,7 @@ if selection:
         margin=dict(l=40, r=40, t=20, b=20),
         height=460,
     )
-    st.plotly_chart(fig, width="stretch")
+    st.plotly_chart(fig)
 else:
     st.info("Sélectionne au moins un titre pour afficher le radar.")
 
@@ -119,7 +119,7 @@ else:
         height=max(240, 40 * len(eligibles)),
         showlegend=False,
     )
-    st.plotly_chart(fig2, width="stretch")
+    st.plotly_chart(fig2)
 
     st.dataframe(
         eligibles[["ticker", "nom", "score", "verdict", "poids_pct", "montant"]].rename(columns={
