@@ -195,6 +195,74 @@ async function handlePutData(request, env) {
   return jsonResponse({ ok: true }, env);
 }
 
+/* ---------- AUTO-REFRESH (Finnhub) ----------
+   Ne couvre que le prix/PER/ROE/P-B des tickers cotés sur les places gérées
+   par l'offre gratuite Finnhub (US notamment) ; renvoie null proprement pour
+   les autres (ex. micro-caps parisiens) — laissés inchangés, pas une erreur.
+   La marge de sécurité VIS, le F-Score, le Z-Score et la checklist Graham ne
+   sont volontairement jamais touchés : aucune API ne reproduit la méthode
+   propriétaire de VIS pour la marge de sécurité, et les scores ne sont pas
+   disponibles sur l'offre gratuite. */
+
+async function fetchFinnhubData(ticker, env) {
+  if (!env.FINNHUB_KEY) return null;
+  try {
+    const [quoteRes, metricRes] = await Promise.all([
+      fetch(`https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(ticker)}&token=${env.FINNHUB_KEY}`),
+      fetch(`https://finnhub.io/api/v1/stock/metric?symbol=${encodeURIComponent(ticker)}&metric=all&token=${env.FINNHUB_KEY}`),
+    ]);
+    if (!quoteRes.ok || !metricRes.ok) return null;
+
+    const quote = await quoteRes.json();
+    const metric = await metricRes.json();
+    const m = metric.metric || {};
+
+    // quote.c === 0 : Finnhub répond "OK" sans données réelles (ticker non couvert)
+    if (!quote || !quote.c) return null;
+
+    return {
+      prix_actuel: quote.c,
+      per: typeof m.peTTM === 'number' ? m.peTTM : undefined,
+      roe: typeof m.roeTTM === 'number' ? m.roeTTM : undefined,
+      pb: typeof m.pbAnnual === 'number' ? m.pbAnnual : undefined,
+    };
+  } catch (e) {
+    return null;
+  }
+}
+
+async function refreshWatchlistData(env) {
+  const raw = await env.STORE.get('data');
+  if (!raw) return { updated: 0, skipped: 0 };
+
+  const data = JSON.parse(raw);
+  const today = new Date().toISOString().slice(0, 10);
+  let updated = 0;
+  let skipped = 0;
+
+  for (const row of data.watchlist || []) {
+    const fresh = await fetchFinnhubData(row.ticker, env);
+    if (!fresh) {
+      skipped += 1;
+      continue;
+    }
+    if (fresh.prix_actuel !== undefined) row.prix_actuel = fresh.prix_actuel;
+    if (fresh.per !== undefined) row.per = fresh.per;
+    if (fresh.roe !== undefined) row.roe = fresh.roe;
+    if (fresh.pb !== undefined) row.pb = fresh.pb;
+    row.derniere_maj_auto = today;
+    updated += 1;
+  }
+
+  await env.STORE.put('data', JSON.stringify(data));
+  return { updated, skipped };
+}
+
+async function handleRefresh(request, env) {
+  const result = await refreshWatchlistData(env);
+  return jsonResponse(result, env);
+}
+
 /* ---------- ROUTAGE ---------- */
 
 export default {
@@ -229,10 +297,19 @@ export default {
       if (url.pathname === '/api/data' && request.method === 'PUT') {
         return await handlePutData(request, env);
       }
+      if (url.pathname === '/api/refresh' && request.method === 'POST') {
+        return await handleRefresh(request, env);
+      }
     } catch (err) {
       return jsonResponse({ error: err.message }, env, 500);
     }
 
     return new Response('Not found', { status: 404, headers: corsHeaders(env) });
+  },
+
+  // Cron Trigger quotidien (voir wrangler.toml [triggers]) — même logique
+  // que POST /api/refresh, déclenchée automatiquement sans action de l'utilisateur.
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(refreshWatchlistData(env));
   },
 };

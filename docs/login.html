@@ -10,6 +10,9 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#2a78d6">
+<script>
+  if (localStorage.getItem("valueboard_theme") === "dark") { document.documentElement.setAttribute("data-theme", "dark"); }
+</script>
 </head>
 <body>
 <div class="login-wrap">

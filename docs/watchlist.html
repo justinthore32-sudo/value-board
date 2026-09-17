@@ -11,6 +11,9 @@
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#2a78d6">
 <script>
+  if (localStorage.getItem("valueboard_theme") === "dark") { document.documentElement.setAttribute("data-theme", "dark"); }
+</script>
+<script>
   if (!localStorage.getItem("valueboard_token")) { location.href = "login.html"; }
 </script>
 </head>
@@ -76,6 +79,9 @@
 
     <div id="list-body" style="display:none;">
       <h2 id="count-heading"></h2>
+
+      <button type="button" class="btn-secondary" id="refresh-btn">🔄 Rafraîchir les prix (Finnhub)</button>
+      <p class="caption" style="margin-top:6px;">Met à jour automatiquement prix/PER/ROE/P-B pour les titres cotés sur les places couvertes (US notamment) — ne touche jamais la marge de sécurité, le F-Score, le Z-Score ni la checklist. Un rafraîchissement automatique tourne aussi une fois par jour.</p>
 
       <div class="pill-toggle" id="status-filter"></div>
 
@@ -187,7 +193,7 @@ function renderTable(scored) {
     <tr>
       <td>${r.ticker}</td><td>${r.nom || ""}</td><td>${r.secteur || ""}</td><td>${r.statut}</td>
       <td>${r.score ?? "—"}</td><td>${r.verdict}</td><td>${r.checklistTxt}</td>
-      <td>${r.alertes ? "⚠️ " + r.alertes : "—"}</td><td>${r.date_maj || ""}</td>
+      <td>${r.alertes ? "⚠️ " + r.alertes : "—"}</td><td>${r.date_maj || ""}${r.derniere_maj_auto ? `<br><span class="caption">🔄 auto : ${r.derniere_maj_auto}</span>` : ""}</td>
     </tr>
   `).join("");
 }
@@ -238,6 +244,23 @@ document.getElementById("delete-btn").addEventListener("click", () => {
   const id = Number(document.getElementById("edit-select").value);
   db.deleteWatchlistRow(id);
   refresh();
+});
+
+document.getElementById("refresh-btn").addEventListener("click", async (e) => {
+  const btn = e.currentTarget;
+  btn.disabled = true;
+  btn.textContent = "🔄 Rafraîchissement en cours…";
+  try {
+    const result = await apiPost("/api/refresh", {});
+    await db.sync();
+    refresh();
+    showToast(`${result.updated} titre(s) mis à jour, ${result.skipped} non couvert(s) par Finnhub.`, "success");
+  } catch (err) {
+    showToast(`Échec du rafraîchissement : ${err.message}`, "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "🔄 Rafraîchir les prix (Finnhub)";
+  }
 });
 
 document.getElementById("export-btn").addEventListener("click", () => {

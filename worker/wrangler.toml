@@ -12,3 +12,9 @@ id = "c5129fe7dbbd403391bacdba5e4ae5a4"
 [[kv_namespaces]]
 binding = "SESSIONS"
 id = "42e52dcd6e434d9b924153748ac19657"
+
+[triggers]
+crons = ["0 6 * * *"]
+
+# Secret posé via `wrangler secret put FINNHUB_KEY` (jamais dans ce fichier) :
+# - FINNHUB_KEY

@@ -1,3 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&display=swap");
+
 :root {
   --blue: #2a78d6;
   --grid: #e1e0d9;
@@ -12,6 +14,31 @@
   --bg: #fcfcfb;
   --card-bg: #ffffff;
   --sidebar-bg: #f4f3ef;
+  --shadow: 0 1px 2px rgba(38,36,31,0.04), 0 4px 12px rgba(38,36,31,0.05);
+  --input-bg: #fbfaf8;
+  --hover-bg: #e9e8e2;
+  --btn-secondary-bg: #ece9e1;
+  --tr-hover-bg: #faf9f6;
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --ink: #e8e6df;
+  --ink-soft: #a8a59c;
+  --border: #3a382f;
+  --bg: #17160f;
+  --card-bg: #211f17;
+  --sidebar-bg: #1c1a13;
+  /* les graphiques Plotly (charts.js) restent volontairement sur fond clair,
+     même en mode sombre — voir plan : évite de réécrire charts.js pour un
+     bénéfice marginal, le graphique se lit comme une "carte" claire posée
+     sur un fond sombre. */
+  --shadow: 0 1px 2px rgba(0,0,0,0.25), 0 4px 16px rgba(0,0,0,0.3);
+  --input-bg: #26241a;
+  --hover-bg: #2a2820;
+  --btn-secondary-bg: #2e2c22;
+  --tr-hover-bg: #1e1c15;
+  color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
@@ -21,6 +48,11 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
   color: var(--ink);
   background: var(--bg);
+  transition: background 0.15s, color 0.15s;
+}
+
+h1, h2, .logo-mark {
+  font-family: "Space Grotesk", -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
 #layout { display: flex; min-height: 100vh; }
@@ -78,7 +110,7 @@ body {
   text-decoration: none;
   font-size: 14px;
 }
-.nav-link:hover { background: #e9e8e2; }
+.nav-link:hover { background: var(--hover-bg); }
 .nav-link.active { background: #dfe8f7; font-weight: 600; color: var(--blue); }
 
 .sidebar-footer { font-size: 12px; }
@@ -104,6 +136,7 @@ p.caption { color: var(--ink-soft); margin: 0 0 18px; max-width: 760px; }
   border-radius: 10px;
   padding: 18px;
   margin-bottom: 18px;
+  box-shadow: var(--shadow);
 }
 
 .kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; margin-bottom: 10px; }
@@ -117,7 +150,7 @@ p.caption { color: var(--ink-soft); margin: 0 0 18px; max-width: 760px; }
 table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
 th { color: var(--ink-soft); font-weight: 600; font-size: 12.5px; text-transform: uppercase; letter-spacing: .02em; }
-tr:hover td { background: #faf9f6; }
+tr:hover td { background: var(--tr-hover-bg); }
 
 .badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12.5px; font-weight: 600; }
 .badge-achat-fort { background: #0ca30c22; color: var(--good); border: 1px solid var(--good); }
@@ -135,7 +168,8 @@ input[type=text], input[type=number], input[type=password], input[type=date], se
   border: 1px solid var(--border);
   border-radius: 6px;
   font-size: 14px;
-  background: #fbfaf8;
+  background: var(--input-bg);
+  color: var(--ink);
   font-family: inherit;
 }
 textarea { resize: vertical; min-height: 70px; }
@@ -153,8 +187,11 @@ button, .btn {
   font-weight: 600;
   background: var(--blue);
   color: white;
+  transition: filter 0.12s, transform 0.05s;
 }
-button.btn-secondary, .btn-secondary { background: #ece9e1; color: var(--ink); }
+button:hover, .btn:hover { filter: brightness(1.08); }
+button:active, .btn:active { transform: translateY(1px); }
+button.btn-secondary, .btn-secondary { background: var(--btn-secondary-bg); color: var(--ink); }
 button.btn-danger { background: #fbeaea; color: var(--bad); }
 button:disabled { opacity: .5; cursor: not-allowed; }
 
@@ -175,11 +212,12 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   background: var(--sidebar-bg);
 }
 .login-card {
-  background: white;
+  background: var(--card-bg);
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 36px;
   width: 360px;
+  box-shadow: var(--shadow);
 }
 .login-card h1 { text-align: center; }
 .login-card p.caption { text-align: center; margin: 0 0 20px; }

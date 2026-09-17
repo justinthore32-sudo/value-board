@@ -11,6 +11,9 @@
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#2a78d6">
 <script>
+  if (localStorage.getItem("valueboard_theme") === "dark") { document.documentElement.setAttribute("data-theme", "dark"); }
+</script>
+<script>
   if (!localStorage.getItem("valueboard_token")) { location.href = "login.html"; }
 </script>
 </head>

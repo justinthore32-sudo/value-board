@@ -78,7 +78,12 @@ code=$(curl -s -o /dev/null -w "%{http_code}" -X PUT "$BASE/api/data" -H "Author
 check "http 413" "413" "$code"
 rm -f /tmp/valueboard_oversized.json
 
-echo "10. Logout puis token révoqué"
+echo "10. POST /api/refresh répond sans casser (pas de FINNHUB_KEY en local → tout skip)"
+resp=$(curl -s -X POST "$BASE/api/refresh" -H "Authorization: Bearer $TOKEN2")
+skipped=$(echo "$resp" | python3 -c "import sys,json; print(json.load(sys.stdin)['skipped'])")
+check "skipped=1 (1 titre TEST, non couvert sans clé)" "1" "$skipped"
+
+echo "11. Logout puis token révoqué"
 curl -s -X POST "$BASE/api/auth/logout" -H "Authorization: Bearer $TOKEN2" > /dev/null
 code=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $TOKEN2" "$BASE/api/data")
 check "http 401 après logout" "401" "$code"
