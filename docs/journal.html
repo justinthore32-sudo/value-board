@@ -6,7 +6,7 @@
 <title>Journal — ValueBoard</title>
 <link rel="stylesheet" href="css/style.css">
 <script>
-  if (sessionStorage.getItem("valueboard_session") !== "1") { location.href = "login.html"; }
+  if (!localStorage.getItem("valueboard_token")) { location.href = "login.html"; }
 </script>
 </head>
 <body>
@@ -41,6 +41,7 @@
   </main>
 </div>
 
+<script src="js/api.js"></script>
 <script src="js/db.js"></script>
 <script src="js/score.js"></script>
 <script src="js/alerts.js"></script>
@@ -89,7 +90,15 @@ document.getElementById("add-form").addEventListener("submit", (e) => {
   refresh();
 });
 
-document.addEventListener("DOMContentLoaded", refresh);
+document.addEventListener("DOMContentLoaded", async () => {
+  try {
+    await db.sync();
+  } catch (err) {
+    window.location.href = "login.html";
+    return;
+  }
+  refresh();
+});
 </script>
 </body>
 </html>

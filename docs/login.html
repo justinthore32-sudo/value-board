@@ -12,14 +12,10 @@
     <h1>🧭 ValueBoard</h1>
     <p class="caption">Tableau de bord d'aide à la décision pour le value investing</p>
 
-    <div id="warning-box" class="warning-box" style="margin-bottom:16px; font-size:13px;">
-      ⚠️ Verrou basique côté navigateur — pas un vrai contrôle d'accès serveur
-      (le code est public). Les identifiants et les données sont propres à cet
-      appareil/navigateur, pas synchronisés ailleurs.
-    </div>
+    <div id="loading" class="info-box" style="margin-bottom:16px; font-size:13px;">Connexion au serveur…</div>
 
-    <div id="create-mode">
-      <p class="caption" style="margin-bottom:8px;">Première utilisation sur cet appareil : crée un nom d'utilisateur et un mot de passe.</p>
+    <div id="create-mode" style="display:none;">
+      <p class="caption" style="margin-bottom:8px;">Premier lancement : crée le compte (un seul compte par Worker).</p>
       <form id="create-form">
         <label for="c-username">Nom d'utilisateur</label>
         <input type="text" id="c-username" required>
@@ -42,51 +38,64 @@
         <button type="submit" style="width:100%; margin-top:16px;">Se connecter</button>
       </form>
     </div>
+
+    <div id="server-error" class="error-box" style="display:none; margin-top:14px;"></div>
   </div>
 </div>
 
+<script src="js/api.js"></script>
 <script src="js/auth.js"></script>
 <script>
-  const cfg = getAuthConfig();
-  document.getElementById("create-mode").style.display = cfg ? "none" : "block";
-  document.getElementById("login-mode").style.display = cfg ? "block" : "none";
+(async () => {
+  try {
+    const exists = await accountExists();
+    document.getElementById("loading").style.display = "none";
+    document.getElementById("create-mode").style.display = exists ? "none" : "block";
+    document.getElementById("login-mode").style.display = exists ? "block" : "none";
+  } catch (err) {
+    document.getElementById("loading").style.display = "none";
+    document.getElementById("server-error").style.display = "block";
+    document.getElementById("server-error").textContent = `Impossible de joindre le serveur : ${err.message}`;
+  }
+})();
 
-  document.getElementById("create-form").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const username = document.getElementById("c-username").value.trim();
-    const password = document.getElementById("c-password").value;
-    const password2 = document.getElementById("c-password2").value;
-    const errorBox = document.getElementById("create-error");
-    errorBox.innerHTML = "";
+document.getElementById("create-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const username = document.getElementById("c-username").value.trim();
+  const password = document.getElementById("c-password").value;
+  const password2 = document.getElementById("c-password2").value;
+  const errorBox = document.getElementById("create-error");
+  errorBox.innerHTML = "";
 
-    if (!username || !password) {
-      errorBox.innerHTML = '<div class="error-box" style="margin-top:10px;">Nom d\'utilisateur et mot de passe obligatoires.</div>';
-      return;
-    }
-    if (password !== password2) {
-      errorBox.innerHTML = '<div class="error-box" style="margin-top:10px;">Les deux mots de passe ne correspondent pas.</div>';
-      return;
-    }
-    await setCredentials(username, password);
-    setAuthenticated();
+  if (!username || !password) {
+    errorBox.innerHTML = '<div class="error-box" style="margin-top:10px;">Nom d\'utilisateur et mot de passe obligatoires.</div>';
+    return;
+  }
+  if (password !== password2) {
+    errorBox.innerHTML = '<div class="error-box" style="margin-top:10px;">Les deux mots de passe ne correspondent pas.</div>';
+    return;
+  }
+  try {
+    await setupAccount(username, password);
     window.location.href = "index.html";
-  });
+  } catch (err) {
+    errorBox.innerHTML = `<div class="error-box" style="margin-top:10px;">${err.message}</div>`;
+  }
+});
 
-  document.getElementById("login-form").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const username = document.getElementById("l-username").value.trim();
-    const password = document.getElementById("l-password").value;
-    const errorBox = document.getElementById("login-error");
-    errorBox.innerHTML = "";
-
-    const ok = await checkCredentials(username, password);
-    if (ok) {
-      setAuthenticated();
-      window.location.href = "index.html";
-    } else {
-      errorBox.innerHTML = '<div class="error-box" style="margin-top:10px;">Nom d\'utilisateur ou mot de passe incorrect.</div>';
-    }
-  });
+document.getElementById("login-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const username = document.getElementById("l-username").value.trim();
+  const password = document.getElementById("l-password").value;
+  const errorBox = document.getElementById("login-error");
+  errorBox.innerHTML = "";
+  try {
+    await login(username, password);
+    window.location.href = "index.html";
+  } catch (err) {
+    errorBox.innerHTML = `<div class="error-box" style="margin-top:10px;">${err.message}</div>`;
+  }
+});
 </script>
 </body>
 </html>

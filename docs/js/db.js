@@ -1,8 +1,8 @@
-/* Couche de données pour ValueBoard statique — remplace db.py.
-   Toutes les données vivent dans localStorage, propres à ce navigateur/appareil
-   (pas de synchronisation entre appareils, voir avertissement dans l'app). */
-
-const STORAGE_KEY = "valueboard_data";
+/* Couche de données pour ValueBoard — synchronisée avec le Worker Cloudflare
+   (voir api.js). Un cache mémoire est chargé une fois par page via
+   `await db.sync()`, puis toutes les lectures/écritures se font dessus ;
+   chaque écriture renvoie l'intégralité du blob au Worker en arrière-plan
+   (pas besoin d'attendre ce renvoi pour que l'UI se mette à jour). */
 
 const STATUTS = ["À surveiller", "Analyse en cours", "Acheté", "Rejeté"];
 
@@ -43,113 +43,109 @@ function _emptyStore() {
   };
 }
 
-function _load() {
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) {
-    const initial = _emptyStore();
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(initial));
-    return initial;
-  }
-  const parsed = JSON.parse(raw);
-  parsed.settings = parsed.settings || { weights: { ...DEFAULT_WEIGHTS }, thresholds: { ...DEFAULT_THRESHOLDS } };
-  parsed.settings.weights = parsed.settings.weights || { ...DEFAULT_WEIGHTS };
-  parsed.settings.thresholds = parsed.settings.thresholds || { ...DEFAULT_THRESHOLDS };
-  parsed.nextIds = parsed.nextIds || { watchlist: 1, portefeuille: 1, theses: 1, valorisations: 1 };
-  return parsed;
+let _cache = null;
+
+function _normalize(data) {
+  data.settings = data.settings || { weights: { ...DEFAULT_WEIGHTS }, thresholds: { ...DEFAULT_THRESHOLDS } };
+  data.settings.weights = data.settings.weights || { ...DEFAULT_WEIGHTS };
+  data.settings.thresholds = data.settings.thresholds || { ...DEFAULT_THRESHOLDS };
+  data.nextIds = data.nextIds || { watchlist: 1, portefeuille: 1, theses: 1, valorisations: 1 };
+  data.watchlist = data.watchlist || [];
+  data.portefeuille = data.portefeuille || [];
+  data.theses = data.theses || [];
+  data.valorisations = data.valorisations || [];
+  return data;
 }
 
-function _save(data) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+function _persist() {
+  apiPut("/api/data", _cache).catch((err) => {
+    window.dispatchEvent(new CustomEvent("valueboard-sync-error", { detail: err.message }));
+  });
 }
 
 const db = {
+  async sync() {
+    const data = await apiGet("/api/data");
+    _cache = _normalize(data || _emptyStore());
+    return _cache;
+  },
+
   // ---------------------------------------------------------------- watchlist
   fetchWatchlist() {
-    return [..._load().watchlist].sort((a, b) => (b.date_maj || "").localeCompare(a.date_maj || ""));
+    return [..._cache.watchlist].sort((a, b) => (b.date_maj || "").localeCompare(a.date_maj || ""));
   },
   addWatchlistRow(row) {
-    const data = _load();
-    const id = data.nextIds.watchlist++;
-    data.watchlist.push({ id, ...row, date_maj: todayISO() });
-    _save(data);
+    const id = _cache.nextIds.watchlist++;
+    _cache.watchlist.push({ id, ...row, date_maj: todayISO() });
+    _persist();
     return id;
   },
   updateWatchlistRow(id, patch) {
-    const data = _load();
-    const idx = data.watchlist.findIndex((r) => r.id === id);
+    const idx = _cache.watchlist.findIndex((r) => r.id === id);
     if (idx === -1) return;
-    data.watchlist[idx] = { ...data.watchlist[idx], ...patch, date_maj: todayISO() };
-    _save(data);
+    _cache.watchlist[idx] = { ..._cache.watchlist[idx], ...patch, date_maj: todayISO() };
+    _persist();
   },
   deleteWatchlistRow(id) {
-    const data = _load();
-    data.watchlist = data.watchlist.filter((r) => r.id !== id);
-    _save(data);
+    _cache.watchlist = _cache.watchlist.filter((r) => r.id !== id);
+    _persist();
   },
 
   // ------------------------------------------------------------------ theses
   fetchTheses(watchlistId = null) {
-    const data = _load();
-    let rows = data.theses;
+    let rows = _cache.theses;
     if (watchlistId != null) {
       rows = rows.filter((t) => t.watchlist_id === watchlistId);
     } else {
       rows = rows.map((t) => {
-        const wl = data.watchlist.find((w) => w.id === t.watchlist_id);
+        const wl = _cache.watchlist.find((w) => w.id === t.watchlist_id);
         return { ...t, ticker: wl ? wl.ticker : "?", nom: wl ? wl.nom : "" };
       });
     }
     return [...rows].sort((a, b) => (b.date_creation || "").localeCompare(a.date_creation || ""));
   },
   addThese(row) {
-    const data = _load();
-    const id = data.nextIds.theses++;
-    data.theses.push({ id, ...row, date_creation: todayISO() });
-    _save(data);
+    const id = _cache.nextIds.theses++;
+    _cache.theses.push({ id, ...row, date_creation: todayISO() });
+    _persist();
     return id;
   },
   deleteThese(id) {
-    const data = _load();
-    data.theses = data.theses.filter((t) => t.id !== id);
-    _save(data);
+    _cache.theses = _cache.theses.filter((t) => t.id !== id);
+    _persist();
   },
 
   // ------------------------------------------------------------- portefeuille
   fetchPortefeuille() {
-    return [..._load().portefeuille].sort((a, b) => (b.date_achat || "").localeCompare(a.date_achat || ""));
+    return [..._cache.portefeuille].sort((a, b) => (b.date_achat || "").localeCompare(a.date_achat || ""));
   },
   addPosition(row) {
-    const data = _load();
-    const id = data.nextIds.portefeuille++;
-    data.portefeuille.push({ id, ...row });
-    _save(data);
+    const id = _cache.nextIds.portefeuille++;
+    _cache.portefeuille.push({ id, ...row });
+    _persist();
     return id;
   },
   updatePosition(id, patch) {
-    const data = _load();
-    const idx = data.portefeuille.findIndex((r) => r.id === id);
+    const idx = _cache.portefeuille.findIndex((r) => r.id === id);
     if (idx === -1) return;
-    data.portefeuille[idx] = { ...data.portefeuille[idx], ...patch };
-    _save(data);
+    _cache.portefeuille[idx] = { ..._cache.portefeuille[idx], ...patch };
+    _persist();
   },
   deletePosition(id) {
-    const data = _load();
-    data.portefeuille = data.portefeuille.filter((r) => r.id !== id);
-    _save(data);
+    _cache.portefeuille = _cache.portefeuille.filter((r) => r.id !== id);
+    _persist();
   },
 
   // ------------------------------------------------------------ valorisations
   fetchValorisations(ticker = null) {
-    const data = _load();
-    let rows = data.valorisations;
+    let rows = _cache.valorisations;
     if (ticker) rows = rows.filter((v) => v.ticker === ticker);
     return [...rows].sort((a, b) => (b.date_calcul || "").localeCompare(a.date_calcul || ""));
   },
   addValorisation(row) {
-    const data = _load();
-    const id = data.nextIds.valorisations++;
-    data.valorisations.push({ id, ...row, date_calcul: todayISO() });
-    _save(data);
+    const id = _cache.nextIds.valorisations++;
+    _cache.valorisations.push({ id, ...row, date_calcul: todayISO() });
+    _persist();
     return id;
   },
   latestValorisation(ticker) {
@@ -159,19 +155,17 @@ const db = {
 
   // ----------------------------------------------------------------settings
   getWeights() {
-    return { ..._load().settings.weights };
+    return { ..._cache.settings.weights };
   },
   getThresholds() {
-    return { ..._load().settings.thresholds };
+    return { ..._cache.settings.thresholds };
   },
   setSetting(key, value) {
-    const data = _load();
-    data.settings[key] = value;
-    _save(data);
+    _cache.settings[key] = value;
+    _persist();
   },
   resetSettings() {
-    const data = _load();
-    data.settings = { weights: { ...DEFAULT_WEIGHTS }, thresholds: { ...DEFAULT_THRESHOLDS } };
-    _save(data);
+    _cache.settings = { weights: { ...DEFAULT_WEIGHTS }, thresholds: { ...DEFAULT_THRESHOLDS } };
+    _persist();
   },
 };

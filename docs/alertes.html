@@ -6,7 +6,7 @@
 <title>Alertes — ValueBoard</title>
 <link rel="stylesheet" href="css/style.css">
 <script>
-  if (sessionStorage.getItem("valueboard_session") !== "1") { location.href = "login.html"; }
+  if (!localStorage.getItem("valueboard_token")) { location.href = "login.html"; }
 </script>
 </head>
 <body>
@@ -32,6 +32,7 @@
   </main>
 </div>
 
+<script src="js/api.js"></script>
 <script src="js/db.js"></script>
 <script src="js/score.js"></script>
 <script src="js/alerts.js"></script>
@@ -51,7 +52,13 @@ function renderList() {
   `).join("");
 }
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
+  try {
+    await db.sync();
+  } catch (err) {
+    window.location.href = "login.html";
+    return;
+  }
   const watchlist = db.fetchWatchlist();
   const portefeuille = db.fetchPortefeuille();
   const theses = db.fetchTheses();

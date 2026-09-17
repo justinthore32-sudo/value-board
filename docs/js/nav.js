@@ -13,7 +13,7 @@ const NAV_ITEMS = [
 
 function renderNav() {
   const current = window.location.pathname.split("/").pop() || "index.html";
-  const cfg = getAuthConfig();
+  const username = localStorage.getItem("valueboard_username") || "";
 
   const links = NAV_ITEMS.map(([href, icon, label]) => {
     const active = href === current ? "active" : "";
@@ -25,15 +25,21 @@ function renderNav() {
   nav.innerHTML = `
     <div class="sidebar-links">${links}</div>
     <div class="sidebar-footer">
-      <p class="muted-small">Connecté : ${cfg ? cfg.username : ""}</p>
+      <div id="sync-error-banner" class="error-box" style="display:none; margin-bottom:10px; font-size:12px;"></div>
+      <p class="muted-small">Connecté : ${username}</p>
       <button id="logout-btn" class="btn-secondary" type="button">Déconnexion</button>
-      <p class="disclaimer">⚠️ Protection basique côté navigateur — pas un vrai contrôle d'accès serveur. Données propres à cet appareil/navigateur (pas de synchronisation entre appareils).</p>
     </div>
   `;
 
   const layout = document.getElementById("layout");
   layout.prepend(nav);
   document.getElementById("logout-btn").addEventListener("click", logout);
+
+  window.addEventListener("valueboard-sync-error", (e) => {
+    const banner = document.getElementById("sync-error-banner");
+    banner.style.display = "block";
+    banner.textContent = `⚠️ Échec de synchronisation avec le serveur : ${e.detail}. Tes derniers changements ne sont peut-être pas sauvegardés.`;
+  });
 }
 
 document.addEventListener("DOMContentLoaded", renderNav);

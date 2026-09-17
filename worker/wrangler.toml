@@ -1,0 +1,14 @@
+name = "value-board-proxy"
+main = "src/index.js"
+compatibility_date = "2025-01-01"
+
+[vars]
+ALLOWED_ORIGIN = "https://justinthore32-sudo.github.io"
+
+[[kv_namespaces]]
+binding = "STORE"
+id = "c5129fe7dbbd403391bacdba5e4ae5a4"
+
+[[kv_namespaces]]
+binding = "SESSIONS"
+id = "42e52dcd6e434d9b924153748ac19657"

@@ -6,7 +6,7 @@
 <title>Réglages — ValueBoard</title>
 <link rel="stylesheet" href="css/style.css">
 <script>
-  if (sessionStorage.getItem("valueboard_session") !== "1") { location.href = "login.html"; }
+  if (!localStorage.getItem("valueboard_token")) { location.href = "login.html"; }
 </script>
 </head>
 <body>
@@ -49,12 +49,10 @@
     </div>
 
     <button type="button" id="reset-btn" class="btn-secondary">↩️ Réinitialiser tous les réglages par défaut</button>
-
-    <hr class="divider">
-    <div class="warning-box">⚠️ Rappel : cette version de ValueBoard est un site statique (GitHub Pages) — la protection par mot de passe est un simple verrou côté navigateur, pas un vrai contrôle d'accès serveur, et les données ne sont pas synchronisées entre tes appareils.</div>
   </main>
 </div>
 
+<script src="js/api.js"></script>
 <script src="js/db.js"></script>
 <script src="js/score.js"></script>
 <script src="js/alerts.js"></script>
@@ -137,7 +135,13 @@ document.getElementById("reset-btn").addEventListener("click", () => {
   alert("Réglages réinitialisés aux valeurs par défaut.");
 });
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
+  try {
+    await db.sync();
+  } catch (err) {
+    window.location.href = "login.html";
+    return;
+  }
   renderWeights();
   renderThresholds();
 });

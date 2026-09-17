@@ -6,7 +6,7 @@
 <title>Fiche Titre — ValueBoard</title>
 <link rel="stylesheet" href="css/style.css">
 <script>
-  if (sessionStorage.getItem("valueboard_session") !== "1") { location.href = "login.html"; }
+  if (!localStorage.getItem("valueboard_token")) { location.href = "login.html"; }
 </script>
 </head>
 <body>
@@ -95,6 +95,7 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/4.1.1/plotly.min.js"></script>
+<script src="js/api.js"></script>
 <script src="js/db.js"></script>
 <script src="js/score.js"></script>
 <script src="js/alerts.js"></script>
@@ -254,7 +255,13 @@ document.getElementById("d-calc").addEventListener("click", () => {
   loadTitle(currentRowId, true);
 });
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
+  try {
+    await db.sync();
+  } catch (err) {
+    window.location.href = "login.html";
+    return;
+  }
   const watchlist = db.fetchWatchlist();
   if (!watchlist.length) {
     document.getElementById("empty").style.display = "block";
