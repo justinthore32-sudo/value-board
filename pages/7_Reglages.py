@@ -1,5 +1,6 @@
 import streamlit as st
 
+from auth import require_auth
 from db import (
     DEFAULT_THRESHOLDS,
     DEFAULT_WEIGHTS,
@@ -12,6 +13,7 @@ from db import (
 from score import METRIC_LABELS
 
 st.set_page_config(page_title="Réglages — ValueBoard", page_icon="⚙️", layout="wide")
+require_auth()
 init_db()
 
 st.title("⚙️ Réglages")

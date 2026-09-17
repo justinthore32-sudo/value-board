@@ -2,6 +2,7 @@ import pandas as pd
 import streamlit as st
 
 from alerts import watchlist_alerts
+from auth import require_auth
 from db import (
     STATUTS,
     add_watchlist_row,
@@ -15,6 +16,7 @@ from db import (
 from score import checklist_pass_rate, compute_score
 
 st.set_page_config(page_title="Watchlist — ValueBoard", page_icon="🔎", layout="wide")
+require_auth()
 init_db()
 
 st.title("🔎 Watchlist")

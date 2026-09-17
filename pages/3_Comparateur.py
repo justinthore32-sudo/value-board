@@ -2,10 +2,12 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
+from auth import require_auth
 from db import fetch_watchlist, get_thresholds, get_weights, init_db
 from score import METRIC_LABELS, compute_score
 
 st.set_page_config(page_title="Comparateur — ValueBoard", page_icon="⚖️", layout="wide")
+require_auth()
 init_db()
 
 st.title("⚖️ Comparateur")

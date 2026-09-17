@@ -2,6 +2,7 @@ import pandas as pd
 import streamlit as st
 
 from alerts import SEVERITY_ICON, portfolio_alerts
+from auth import require_auth
 from db import (
     add_position,
     delete_position,
@@ -15,6 +16,7 @@ from db import (
 )
 
 st.set_page_config(page_title="Portefeuille — ValueBoard", page_icon="💼", layout="wide")
+require_auth()
 init_db()
 
 st.title("💼 Portefeuille")

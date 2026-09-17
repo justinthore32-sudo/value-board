@@ -2,6 +2,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from alerts import watchlist_alerts, portfolio_alerts
+from auth import require_auth
 from db import (
     add_valorisation,
     fetch_portefeuille,
@@ -16,6 +17,7 @@ from db import (
 from score import CHECKLIST_ITEMS, METRIC_LABELS, checklist_status, compute_score
 
 st.set_page_config(page_title="Fiche Titre — ValueBoard", page_icon="🗂️", layout="wide")
+require_auth()
 init_db()
 
 st.title("🗂️ Fiche Titre")

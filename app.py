@@ -13,6 +13,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from alerts import all_alerts
+from auth import require_auth
 from db import (
     fetch_portefeuille,
     fetch_theses,
@@ -25,6 +26,7 @@ from db import (
 from score import VERDICT_COLORS, compute_score
 
 st.set_page_config(page_title="ValueBoard", page_icon="🧭", layout="wide")
+require_auth()
 init_db()
 
 st.title("🧭 ValueBoard")

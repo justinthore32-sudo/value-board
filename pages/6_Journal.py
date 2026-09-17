@@ -1,8 +1,10 @@
 import streamlit as st
 
+from auth import require_auth
 from db import add_these, delete_these, fetch_theses, fetch_watchlist, init_db
 
 st.set_page_config(page_title="Journal — ValueBoard", page_icon="📓", layout="wide")
+require_auth()
 init_db()
 
 st.title("📓 Journal de thèse d'investissement")

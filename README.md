@@ -59,8 +59,25 @@ cd value-board
 python3 -m venv .venv
 source .venv/bin/activate        # sous Windows : .venv\Scripts\activate
 pip install -r requirements.txt
+python scripts/set_credentials.py   # définit ton nom d'utilisateur / mot de passe
 streamlit run app.py
 ```
+
+## Authentification
+
+L'app est protégée par un écran de connexion (nom d'utilisateur + mot de
+passe) — aucun service tiers, aucun appel réseau : les identifiants sont un
+hash PBKDF2 salé stocké dans `.streamlit/secrets.toml` (fichier local,
+jamais commité, voir `.gitignore`).
+
+**Premier lancement / changer les identifiants :**
+```bash
+python scripts/set_credentials.py
+```
+Le mot de passe est saisi en local (masqué, jamais affiché) et n'est jamais
+transmis ailleurs. Tant que ce script n'a pas été lancé une première fois,
+l'app affiche une erreur et bloque l'accès — c'est volontaire (sécurisé par
+défaut plutôt qu'ouvert par défaut).
 
 ## Déployer gratuitement en ligne (Streamlit Community Cloud)
 
@@ -77,7 +94,13 @@ streamlit run app.py
    ton compte GitHub.
 3. **New app** → sélectionne le dépôt `value-board`, la branche `main`, le
    fichier `app.py`.
-4. Déploie — l'app est en ligne en quelques minutes.
+4. Avant de déployer (ou juste après) : dans le menu de l'app → **Settings**
+   → **Secrets**, colle le contenu de ton `.streamlit/secrets.toml` local
+   (`AUTH_USERNAME`, `AUTH_PASSWORD_HASH`, `AUTH_SALT`). Le fichier local
+   n'est jamais poussé sur le dépôt public — c'est le seul moyen de
+   transmettre les identifiants à la version en ligne.
+5. Déploie — l'app est en ligne en quelques minutes, protégée par ton
+   écran de connexion.
 
 ⚠️ Sur un déploiement gratuit, le système de fichiers n'est pas garanti
 persistant entre redémarrages. Pour un usage régulier, privilégie un

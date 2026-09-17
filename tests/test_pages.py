@@ -40,6 +40,7 @@ def isolated_db(tmp_path, monkeypatch):
 
 def _run(script: str) -> AppTest:
     at = AppTest.from_file(str(ROOT / script))
+    at.session_state["authenticated"] = True  # contourne le gate d'auth pour tester le contenu
     at.run()
     return at
 
@@ -49,6 +50,17 @@ def _run(script: str) -> AppTest:
 def test_page_starts_without_exception_on_empty_db(isolated_db, script):
     at = _run(script)
     assert not at.exception
+
+
+# --------------------------------------------------------------------- auth
+@pytest.mark.parametrize("script", ALL_SCRIPTS)
+def test_page_blocks_access_without_authentication(isolated_db, script):
+    at = AppTest.from_file(str(ROOT / script))  # pas de session_state["authenticated"]
+    at.run()
+    assert not at.exception
+    # le contenu de la page (ex. les KPIs st.metric de l'accueil) ne doit jamais s'afficher
+    assert len(at.metric) == 0
+    assert len(at.dataframe) == 0
 
 
 # --------------------------------------------------------- jeu de données test

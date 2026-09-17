@@ -1,6 +1,7 @@
 import streamlit as st
 
 from alerts import SEVERITY_ICON, all_alerts
+from auth import require_auth
 from db import (
     fetch_portefeuille,
     fetch_theses,
@@ -11,6 +12,7 @@ from db import (
 )
 
 st.set_page_config(page_title="Alertes — ValueBoard", page_icon="🚨", layout="wide")
+require_auth()
 init_db()
 
 st.title("🚨 Alertes")
