@@ -74,8 +74,8 @@ jamais commité, voir `.gitignore`).
 ```bash
 python scripts/set_credentials.py
 ```
-Le mot de passe est saisi en local (masqué, jamais affiché) et n'est jamais
-transmis ailleurs. Tant que ce script n'a pas été lancé une première fois,
+Le mot de passe est saisi en local (visible dans le terminal pendant la
+frappe, pour éviter les erreurs de saisie) et n'est jamais transmis ailleurs. Tant que ce script n'a pas été lancé une première fois,
 l'app affiche une erreur et bloque l'accès — c'est volontaire (sécurisé par
 défaut plutôt qu'ouvert par défaut).
 

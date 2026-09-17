@@ -5,9 +5,10 @@ Définit (ou change) le nom d'utilisateur et le mot de passe de ValueBoard.
 
     python scripts/set_credentials.py
 
-La saisie du mot de passe est masquée (getpass) et n'est jamais affichée ni
-écrite en clair : seul un hash PBKDF2 salé est enregistré, dans
-.streamlit/secrets.toml (fichier local, jamais commité — voir .gitignore).
+Le mot de passe est saisi en clair dans le terminal (visible pendant la
+frappe) — c'est un script 100% local qui ne fait aucun appel réseau ; seul
+un hash PBKDF2 salé est ensuite enregistré, dans .streamlit/secrets.toml
+(fichier local, jamais commité — voir .gitignore).
 
 Pour un déploiement sur Streamlit Community Cloud, recopie le contenu de ce
 fichier dans les "Secrets" de l'application (menu de l'app → Settings →
@@ -16,7 +17,6 @@ Secrets) : le fichier local n'est jamais poussé sur le dépôt public.
 
 from __future__ import annotations
 
-import getpass
 import secrets
 import sys
 from pathlib import Path
@@ -34,13 +34,15 @@ def main() -> None:
         print("Le nom d'utilisateur ne peut pas être vide.")
         return
 
-    password = getpass.getpass("Mot de passe : ")
-    confirm = getpass.getpass("Confirme le mot de passe : ")
+    password = input("Mot de passe (visible pendant la frappe, terminal local uniquement) : ")
     if not password:
         print("Le mot de passe ne peut pas être vide.")
         return
-    if password != confirm:
-        print("Les deux saisies ne correspondent pas. Rien n'a été enregistré.")
+
+    print(f"\nTu as saisi : {'*' * len(password)} ({len(password)} caractères)")
+    confirm = input("Confirmer et enregistrer ? (o/n) : ").strip().lower()
+    if confirm not in ("o", "oui", "y", "yes"):
+        print("Annulé. Rien n'a été enregistré.")
         return
 
     salt = secrets.token_hex(16)
