@@ -68,6 +68,7 @@ function _persist() {
    dans le score ont un intérêt à être suivies dans le temps. */
 const TRACKED_METRIC_FIELDS = [
   "prix_actuel", "per", "pb", "roe", "dette_ebitda", "f_score", "z_score", "marge_securite_vis",
+  "zscore_modele", "fscore_details",
 ];
 
 function snapshotMetrics(row) {

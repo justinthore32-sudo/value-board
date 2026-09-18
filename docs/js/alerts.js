@@ -27,11 +27,15 @@ function watchlistAlerts(watchlist, thresholds) {
         message: `Dette/EBITDA de ${Number(row.dette_ebitda).toFixed(1)}x > seuil (${(thresholds.dette_ebitda_alerte ?? 3.0).toFixed(1)}x).`,
       });
     }
-    if (isNum(row.z_score) && Number(row.z_score) < (thresholds.z_score_detresse ?? 1.81)) {
-      alerts.push({
-        ticker, nom, categorie: "Watchlist", severity: "critical", type: "Détresse financière",
-        message: `Altman Z-Score de ${Number(row.z_score).toFixed(2)} sous le seuil de détresse (${(thresholds.z_score_detresse ?? 1.81).toFixed(2)}).`,
-      });
+    if (isNum(row.z_score)) {
+      const { detresse } = resolveZScoreThresholds(row.zscore_modele, thresholds);
+      if (Number(row.z_score) < detresse) {
+        const modele = ZSCORE_MODELS[row.zscore_modele] ? ZSCORE_MODELS[row.zscore_modele].label : ZSCORE_MODELS.original.label;
+        alerts.push({
+          ticker, nom, categorie: "Watchlist", severity: "critical", type: "Détresse financière",
+          message: `Altman Z-Score de ${Number(row.z_score).toFixed(2)} sous le seuil de détresse (${detresse.toFixed(2)}, modèle ${modele}).`,
+        });
+      }
     }
   }
   return alerts;

@@ -138,7 +138,14 @@ function loadTitle(id, keepCalcResult = false) {
   const result = computeScore(row, weights, thresholds);
 
   document.getElementById("fh-name").textContent = `${row.ticker} — ${row.nom || ""}`;
-  document.getElementById("fh-sub").textContent = `${row.secteur || "Secteur non renseigné"} · Statut : ${row.statut}`;
+  let subText = `${row.secteur || "Secteur non renseigné"} · Statut : ${row.statut}`;
+  if (row.secteur && isNum(row.per)) {
+    const secStats = sectorStats(watchlist)[row.secteur];
+    if (secStats && secStats.per_median !== null) {
+      subText += ` · PER ${Number(row.per).toFixed(1)} — médiane secteur ${row.secteur} : ${secStats.per_median.toFixed(1)}`;
+    }
+  }
+  document.getElementById("fh-sub").textContent = subText;
   document.getElementById("fh-score").textContent = result.score !== null ? `${result.score.toFixed(0)}/100` : "N/A";
   const color = VERDICT_COLORS[result.verdict] || "#898781";
   document.getElementById("fh-verdict").innerHTML = `<div style="padding:10px 16px;border-radius:8px;background:${color}22;border:1px solid ${color};text-align:center;font-weight:600;color:${color};">${result.verdict}</div>`;
@@ -165,10 +172,18 @@ function loadTitle(id, keepCalcResult = false) {
     const label = METRIC_LABELS[k];
     const sub = result.subScores[k];
     const raw = result.rawValues[k];
+    let suffix = "";
+    if (k === "z_score") {
+      const modele = ZSCORE_MODELS[row.zscore_modele] || ZSCORE_MODELS.original;
+      suffix = ` — modèle ${modele.label}`;
+    }
+    if (k === "f_score" && computeFScoreFromDetails(row.fscore_details) !== null) {
+      suffix = " — calculé depuis le détail Piotroski (9/9 critères)";
+    }
     if (sub === null) return `<p class="caption"><strong>${label}</strong> — donnée non renseignée</p>`;
     return `
       <div style="margin-bottom:10px;">
-        <div style="font-size:13px; margin-bottom:3px;">${label} : ${sub.toFixed(0)}/100 (valeur brute : ${raw})</div>
+        <div style="font-size:13px; margin-bottom:3px;">${label} : ${sub.toFixed(0)}/100 (valeur brute : ${raw})${suffix}</div>
         <div style="background:#e9e7e0; border-radius:6px; height:8px;"><div style="width:${sub}%; background:#2a78d6; height:8px; border-radius:6px;"></div></div>
       </div>`;
   }).join("");

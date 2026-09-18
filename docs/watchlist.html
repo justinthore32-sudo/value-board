@@ -57,6 +57,13 @@
         <div class="form-row">
           <div><label>Marge de sécurité VIS (%)</label><input type="number" id="f-marge" step="0.01"></div>
           <div><label>Croissance estimée (%/an)</label><input type="number" id="f-croissance" step="0.01"></div>
+          <div><label>Modèle Z-Score</label>
+            <select id="f-zmodele">
+              <option value="original">Original (manufacturier coté)</option>
+              <option value="prive">Z′ (entreprise privée)</option>
+              <option value="em_service">Z″ (non-manufacturier / marché émergent)</option>
+            </select>
+          </div>
         </div>
 
         <h3>Checklist Graham (critères qualitatifs)</h3>
@@ -67,6 +74,10 @@
           <label><input type="checkbox" id="f-dividende-cont"> Dividende continu</label>
           <label><input type="checkbox" id="f-croissance-benef"> Croissance bénéfices</label>
         </div>
+
+        <h3>Détail F-Score Piotroski (optionnel)</h3>
+        <label class="checkbox-row"><input type="checkbox" id="f-fscore-use-details"> Renseigner le détail (remplace le F-Score saisi ci-dessus une fois activé)</label>
+        <div class="pill-toggle" id="f-fscore-details"></div>
 
         <label>Notes</label>
         <textarea id="f-notes"></textarea>
@@ -129,6 +140,13 @@
         <div class="form-row">
           <div><label>Marge de sécurité VIS (%)</label><input type="number" id="e-marge" step="0.01"></div>
           <div><label>Croissance estimée (%/an)</label><input type="number" id="e-croissance" step="0.01"></div>
+          <div><label>Modèle Z-Score</label>
+            <select id="e-zmodele">
+              <option value="original">Original (manufacturier coté)</option>
+              <option value="prive">Z′ (entreprise privée)</option>
+              <option value="em_service">Z″ (non-manufacturier / marché émergent)</option>
+            </select>
+          </div>
         </div>
 
         <h3>Checklist Graham (critères qualitatifs)</h3>
@@ -139,6 +157,10 @@
           <label><input type="checkbox" id="e-dividende-cont"> Dividende continu</label>
           <label><input type="checkbox" id="e-croissance-benef"> Croissance bénéfices</label>
         </div>
+
+        <h3>Détail F-Score Piotroski (optionnel)</h3>
+        <label class="checkbox-row"><input type="checkbox" id="e-fscore-use-details"> Renseigner le détail (remplace le F-Score saisi ci-dessus une fois activé)</label>
+        <div class="pill-toggle" id="e-fscore-details"></div>
 
         <label>Notes</label>
         <textarea id="e-notes"></textarea>
@@ -167,6 +189,30 @@
 let statusFilterState = [...STATUTS];
 
 function numOrNull(v) { return v === "" || v === null ? null : Number(v); }
+
+function renderFScoreCheckboxes(containerId) {
+  document.getElementById(containerId).innerHTML = FSCORE_CRITERIA.map(([key, label]) => `
+    <label><input type="checkbox" data-fkey="${key}"> ${label}</label>
+  `).join("");
+}
+renderFScoreCheckboxes("f-fscore-details");
+renderFScoreCheckboxes("e-fscore-details");
+
+function readFScoreDetails(useDetailsId, containerId) {
+  if (!document.getElementById(useDetailsId).checked) return null;
+  const details = {};
+  document.querySelectorAll(`#${containerId} input[data-fkey]`).forEach((cb) => {
+    details[cb.dataset.fkey] = cb.checked ? 1 : 0;
+  });
+  return details;
+}
+
+function fillFScoreDetails(containerId, useDetailsId, details) {
+  document.getElementById(useDetailsId).checked = Boolean(details);
+  document.querySelectorAll(`#${containerId} input[data-fkey]`).forEach((cb) => {
+    cb.checked = Boolean(details && Number(details[cb.dataset.fkey]));
+  });
+}
 
 function refresh() {
   const df = db.fetchWatchlist();
@@ -225,11 +271,13 @@ function refresh() {
     document.getElementById("e-zscore").value = row.z_score ?? "";
     document.getElementById("e-marge").value = row.marge_securite_vis ?? "";
     document.getElementById("e-croissance").value = row.croissance_estimee ?? "";
+    document.getElementById("e-zmodele").value = row.zscore_modele || "original";
     document.getElementById("e-taille").checked = Boolean(Number(row.taille_ok));
     document.getElementById("e-bilan").checked = Boolean(Number(row.bilan_solide));
     document.getElementById("e-benefices").checked = Boolean(Number(row.benefices_stables));
     document.getElementById("e-dividende-cont").checked = Boolean(Number(row.dividende_continu));
     document.getElementById("e-croissance-benef").checked = Boolean(Number(row.croissance_benefices));
+    fillFScoreDetails("e-fscore-details", "e-fscore-use-details", row.fscore_details);
     document.getElementById("e-notes").value = row.notes || "";
   };
   select.onchange = fillEdit;
@@ -269,11 +317,13 @@ document.getElementById("add-form").addEventListener("submit", (e) => {
     z_score: numOrNull(document.getElementById("f-zscore").value),
     marge_securite_vis: numOrNull(document.getElementById("f-marge").value),
     croissance_estimee: numOrNull(document.getElementById("f-croissance").value),
+    zscore_modele: document.getElementById("f-zmodele").value,
     taille_ok: document.getElementById("f-taille").checked ? 1 : 0,
     bilan_solide: document.getElementById("f-bilan").checked ? 1 : 0,
     benefices_stables: document.getElementById("f-benefices").checked ? 1 : 0,
     dividende_continu: document.getElementById("f-dividende-cont").checked ? 1 : 0,
     croissance_benefices: document.getElementById("f-croissance-benef").checked ? 1 : 0,
+    fscore_details: readFScoreDetails("f-fscore-use-details", "f-fscore-details"),
     notes: document.getElementById("f-notes").value,
   });
   e.target.reset();
@@ -300,11 +350,13 @@ document.getElementById("edit-form").addEventListener("submit", (e) => {
     z_score: numOrNull(document.getElementById("e-zscore").value),
     marge_securite_vis: numOrNull(document.getElementById("e-marge").value),
     croissance_estimee: numOrNull(document.getElementById("e-croissance").value),
+    zscore_modele: document.getElementById("e-zmodele").value,
     taille_ok: document.getElementById("e-taille").checked ? 1 : 0,
     bilan_solide: document.getElementById("e-bilan").checked ? 1 : 0,
     benefices_stables: document.getElementById("e-benefices").checked ? 1 : 0,
     dividende_continu: document.getElementById("e-dividende-cont").checked ? 1 : 0,
     croissance_benefices: document.getElementById("e-croissance-benef").checked ? 1 : 0,
+    fscore_details: readFScoreDetails("e-fscore-use-details", "e-fscore-details"),
     notes: document.getElementById("e-notes").value,
   });
   refresh();
@@ -337,7 +389,7 @@ document.getElementById("refresh-btn").addEventListener("click", async (e) => {
 document.getElementById("export-btn").addEventListener("click", () => {
   const scored = window._scoredWatchlist || [];
   const cols = ["ticker", "nom", "secteur", "statut", "prix_actuel", "devise", "per", "pb", "pcf",
-    "rendement_dividende", "dette_ebitda", "roe", "f_score", "z_score", "marge_securite_vis",
+    "rendement_dividende", "dette_ebitda", "roe", "f_score", "z_score", "zscore_modele", "marge_securite_vis",
     "croissance_estimee", "notes", "date_maj", "score", "verdict"];
   const header = cols.join(",");
   const rows = scored.map((r) => cols.map((c) => {

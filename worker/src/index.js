@@ -381,14 +381,35 @@ function isNumValue(value) {
   return !Number.isNaN(Number(value));
 }
 
-function normalizeMetricValue(name, value, thresholds) {
+const ZSCORE_MODELS_VALUE = {
+  prive: { detresse: 1.23, sain: 2.90 },
+  em_service: { detresse: 1.10, sain: 2.60 },
+};
+
+function resolveZScoreThresholdsValue(zscoreModele, thresholds) {
+  const model = zscoreModele && zscoreModele !== 'original' ? ZSCORE_MODELS_VALUE[zscoreModele] : null;
+  if (model) return model;
+  return { detresse: thresholds.z_score_detresse ?? 1.81, sain: thresholds.z_score_sain ?? 2.99 };
+}
+
+const FSCORE_CRITERIA_VALUE = [
+  'roa_positif', 'cfo_positif', 'roa_croissant', 'qualite_accruals', 'levier_baisse',
+  'liquidite_hausse', 'pas_dilution', 'marge_brute_hausse', 'rotation_actifs_hausse',
+];
+
+function computeFScoreFromDetailsValue(details) {
+  if (!details) return null;
+  if (!FSCORE_CRITERIA_VALUE.every((k) => details[k] !== undefined && details[k] !== null)) return null;
+  return FSCORE_CRITERIA_VALUE.reduce((sum, k) => sum + (Number(details[k]) ? 1 : 0), 0);
+}
+
+function normalizeMetricValue(name, value, thresholds, zscoreModele) {
   if (!isNumValue(value)) return null;
   const v = Number(value);
   if (name === 'marge_securite') return clipValue((v / 50) * 100, 0, 100);
   if (name === 'f_score') return clipValue((v / 9) * 100, 0, 100);
   if (name === 'z_score') {
-    const lo = thresholds.z_score_detresse ?? 1.81;
-    const hi = thresholds.z_score_sain ?? 2.99;
+    const { detresse: lo, sain: hi } = resolveZScoreThresholdsValue(zscoreModele, thresholds);
     if (v <= lo) return 0;
     if (v >= hi) return 100;
     return clipValue(((v - lo) / (hi - lo)) * 100, 0, 100);
@@ -400,9 +421,10 @@ function normalizeMetricValue(name, value, thresholds) {
 }
 
 function computeScoreValue(row, weights, thresholds) {
+  const fscoreFromDetails = computeFScoreFromDetailsValue(row.fscore_details);
   const rawValues = {
     marge_securite: row.marge_securite_vis,
-    f_score: row.f_score,
+    f_score: fscoreFromDetails !== null ? fscoreFromDetails : row.f_score,
     z_score: row.z_score,
     dette_ebitda: row.dette_ebitda,
     roe: row.roe,
@@ -411,7 +433,7 @@ function computeScoreValue(row, weights, thresholds) {
   let totalWeight = 0;
   let weightedSum = 0;
   for (const name of Object.keys(rawValues)) {
-    const sub = normalizeMetricValue(name, rawValues[name], thresholds);
+    const sub = normalizeMetricValue(name, rawValues[name], thresholds, row.zscore_modele);
     const w = Number(weights[name] || 0);
     if (sub !== null && w > 0) {
       weightedSum += sub * w;

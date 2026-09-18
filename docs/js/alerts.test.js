@@ -4,9 +4,13 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-// alerts.js s'appuie sur isNum() (score.js) et todayISO() (db.js) comme globales
-// navigateur — on les fournit ici avant de charger alerts.js.
-global.isNum = require("./score.js").isNum;
+// alerts.js s'appuie sur isNum()/resolveZScoreThresholds()/ZSCORE_MODELS
+// (score.js) et todayISO() (db.js) comme globales navigateur — on les
+// fournit ici avant de charger alerts.js.
+const scoreModule = require("./score.js");
+global.isNum = scoreModule.isNum;
+global.resolveZScoreThresholds = scoreModule.resolveZScoreThresholds;
+global.ZSCORE_MODELS = scoreModule.ZSCORE_MODELS;
 global.todayISO = () => new Date().toISOString().slice(0, 10);
 
 const { watchlistAlerts, portfolioAlerts } = require("./alerts.js");
