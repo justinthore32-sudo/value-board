@@ -58,6 +58,8 @@
         </div>
       </div>
 
+      <div id="metric-history" style="margin-top:16px;"></div>
+
       <hr class="divider">
       <h2>Checklist Graham</h2>
       <div id="checklist" class="form-row"></div>
@@ -170,6 +172,24 @@ function loadTitle(id, keepCalcResult = false) {
         <div style="background:#e9e7e0; border-radius:6px; height:8px;"><div style="width:${sub}%; background:#2a78d6; height:8px; border-radius:6px;"></div></div>
       </div>`;
   }).join("");
+
+  // toujours ajouté en fin de tableau -> l'ordre d'insertion est déjà chronologique,
+  // on l'inverse simplement (un tri par date seule ne départage pas 2 points du même jour)
+  const historique = [...(row.historique || [])].reverse();
+  document.getElementById("metric-history").innerHTML = historique.length > 1 ? `
+    <h3>Historique des métriques</h3>
+    <p class="caption">Un point à chaque modification de métrique ou rafraîchissement automatique — permet de voir si le dossier s'améliore ou se dégrade.</p>
+    <table>
+      <thead><tr><th>Date</th><th>Score</th><th>Verdict</th><th>Prix</th><th>PER</th><th>ROE</th><th>Marge séc.</th><th>F-Score</th><th>Z-Score</th></tr></thead>
+      <tbody>${historique.map((h) => `
+        <tr>
+          <td>${h.date}</td><td>${h.score ?? "—"}</td><td>${h.verdict || "—"}</td>
+          <td>${h.prix_actuel ?? "—"}</td><td>${h.per ?? "—"}</td><td>${h.roe ?? "—"}</td>
+          <td>${h.marge_securite_vis ?? "—"}</td><td>${h.f_score ?? "—"}</td><td>${h.z_score ?? "—"}</td>
+        </tr>
+      `).join("")}</tbody>
+    </table>
+  ` : "";
 
   renderChecklist(row);
 

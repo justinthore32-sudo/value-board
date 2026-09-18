@@ -367,6 +367,83 @@ function emptyStore() {
   };
 }
 
+/* Copie minimale de la logique de docs/js/score.js — nécessaire pour que le
+   snapshot d'historique posé par l'auto-refresh Finnhub porte un score/verdict
+   cohérents avec ce que verrait l'utilisateur côté client à ce moment-là (le
+   ROE, mis à jour par Finnhub, entre dans le score). À garder synchronisée
+   avec normalizeMetric/computeScore si leur formule change. */
+function clipValue(value, lo, hi) {
+  return Math.max(lo, Math.min(hi, value));
+}
+
+function isNumValue(value) {
+  if (value === null || value === undefined || value === '') return false;
+  return !Number.isNaN(Number(value));
+}
+
+function normalizeMetricValue(name, value, thresholds) {
+  if (!isNumValue(value)) return null;
+  const v = Number(value);
+  if (name === 'marge_securite') return clipValue((v / 50) * 100, 0, 100);
+  if (name === 'f_score') return clipValue((v / 9) * 100, 0, 100);
+  if (name === 'z_score') {
+    const lo = thresholds.z_score_detresse ?? 1.81;
+    const hi = thresholds.z_score_sain ?? 2.99;
+    if (v <= lo) return 0;
+    if (v >= hi) return 100;
+    return clipValue(((v - lo) / (hi - lo)) * 100, 0, 100);
+  }
+  if (name === 'dette_ebitda') return clipValue(100 - (v / 5) * 100, 0, 100);
+  if (name === 'roe') return clipValue((v / 25) * 100, 0, 100);
+  if (name === 'dividende') return clipValue((v / 6) * 100, 0, 100);
+  return null;
+}
+
+function computeScoreValue(row, weights, thresholds) {
+  const rawValues = {
+    marge_securite: row.marge_securite_vis,
+    f_score: row.f_score,
+    z_score: row.z_score,
+    dette_ebitda: row.dette_ebitda,
+    roe: row.roe,
+    dividende: row.rendement_dividende,
+  };
+  let totalWeight = 0;
+  let weightedSum = 0;
+  for (const name of Object.keys(rawValues)) {
+    const sub = normalizeMetricValue(name, rawValues[name], thresholds);
+    const w = Number(weights[name] || 0);
+    if (sub !== null && w > 0) {
+      weightedSum += sub * w;
+      totalWeight += w;
+    }
+  }
+  const score = totalWeight > 0 ? Math.round((weightedSum / totalWeight) * 10) / 10 : null;
+  let verdict = 'Données insuffisantes';
+  if (score !== null) {
+    const achatFort = thresholds.verdict_achat_fort ?? 75.0;
+    const surveiller = thresholds.verdict_surveiller ?? 50.0;
+    verdict = score >= achatFort ? 'Achat fort' : score >= surveiller ? 'À surveiller' : 'Écarter';
+  }
+  return { score, verdict };
+}
+
+function snapshotMetricsValue(row, weights, thresholds) {
+  const { score, verdict } = computeScoreValue(row, weights, thresholds);
+  return {
+    date: new Date().toISOString().slice(0, 10),
+    prix_actuel: row.prix_actuel ?? null,
+    per: row.per ?? null,
+    pb: row.pb ?? null,
+    roe: row.roe ?? null,
+    dette_ebitda: row.dette_ebitda ?? null,
+    f_score: row.f_score ?? null,
+    z_score: row.z_score ?? null,
+    marge_securite_vis: row.marge_securite_vis ?? null,
+    score, verdict,
+  };
+}
+
 async function handleGetData(request, env, username) {
   const raw = await env.STORE.get(`data:${username}`);
   const data = raw ? JSON.parse(raw) : emptyStore();
@@ -436,6 +513,8 @@ async function refreshWatchlistDataFor(env, username) {
 
   const data = JSON.parse(raw);
   const today = new Date().toISOString().slice(0, 10);
+  const weights = (data.settings && data.settings.weights) || DEFAULT_WEIGHTS;
+  const thresholds = (data.settings && data.settings.thresholds) || DEFAULT_THRESHOLDS;
   let updated = 0;
   let skipped = 0;
 
@@ -450,6 +529,7 @@ async function refreshWatchlistDataFor(env, username) {
     if (fresh.roe !== undefined) row.roe = fresh.roe;
     if (fresh.pb !== undefined) row.pb = fresh.pb;
     row.derniere_maj_auto = today;
+    row.historique = [...(row.historique || []), snapshotMetricsValue(row, weights, thresholds)];
     updated += 1;
   }
 

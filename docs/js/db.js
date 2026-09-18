@@ -50,7 +50,7 @@ function _normalize(data) {
   data.settings.weights = data.settings.weights || { ...DEFAULT_WEIGHTS };
   data.settings.thresholds = data.settings.thresholds || { ...DEFAULT_THRESHOLDS };
   data.nextIds = data.nextIds || { watchlist: 1, portefeuille: 1, theses: 1, valorisations: 1 };
-  data.watchlist = data.watchlist || [];
+  data.watchlist = (data.watchlist || []).map((row) => ({ historique: [], ...row }));
   data.portefeuille = data.portefeuille || [];
   data.theses = data.theses || [];
   data.valorisations = data.valorisations || [];
@@ -61,6 +61,32 @@ function _persist() {
   apiPut("/api/data", _cache).catch((err) => {
     window.dispatchEvent(new CustomEvent("valueboard-sync-error", { detail: err.message }));
   });
+}
+
+/* Champs dont la variation déclenche un nouveau point d'historique — le
+   statut/notes/date n'en font pas partie, seules les métriques qui entrent
+   dans le score ont un intérêt à être suivies dans le temps. */
+const TRACKED_METRIC_FIELDS = [
+  "prix_actuel", "per", "pb", "roe", "dette_ebitda", "f_score", "z_score", "marge_securite_vis",
+];
+
+function snapshotMetrics(row) {
+  const weights = db.getWeights();
+  const thresholds = db.getThresholds();
+  const result = computeScore(row, weights, thresholds);
+  return {
+    date: todayISO(),
+    prix_actuel: row.prix_actuel ?? null,
+    per: row.per ?? null,
+    pb: row.pb ?? null,
+    roe: row.roe ?? null,
+    dette_ebitda: row.dette_ebitda ?? null,
+    f_score: row.f_score ?? null,
+    z_score: row.z_score ?? null,
+    marge_securite_vis: row.marge_securite_vis ?? null,
+    score: result.score,
+    verdict: result.verdict,
+  };
 }
 
 const db = {
@@ -76,14 +102,21 @@ const db = {
   },
   addWatchlistRow(row) {
     const id = _cache.nextIds.watchlist++;
-    _cache.watchlist.push({ id, ...row, date_maj: todayISO() });
+    const full = { id, historique: [], ...row, date_maj: todayISO() };
+    full.historique = [snapshotMetrics(full)];
+    _cache.watchlist.push(full);
     _persist();
     return id;
   },
   updateWatchlistRow(id, patch) {
     const idx = _cache.watchlist.findIndex((r) => r.id === id);
     if (idx === -1) return;
-    _cache.watchlist[idx] = { ..._cache.watchlist[idx], ...patch, date_maj: todayISO() };
+    const updated = { ..._cache.watchlist[idx], ...patch, date_maj: todayISO() };
+    const metricChanged = Object.keys(patch).some((k) => TRACKED_METRIC_FIELDS.includes(k));
+    if (metricChanged) {
+      updated.historique = [...(updated.historique || []), snapshotMetrics(updated)];
+    }
+    _cache.watchlist[idx] = updated;
     _persist();
   },
   deleteWatchlistRow(id) {
