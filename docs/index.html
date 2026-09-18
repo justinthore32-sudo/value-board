@@ -86,8 +86,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
   hideLoading();
 
-  const username = localStorage.getItem("valueboard_username") || "";
-  document.getElementById("greeting-name").textContent = `Bonjour ${username}`;
+  const displayName = localStorage.getItem("valueboard_display_name") || localStorage.getItem("valueboard_username") || "";
+  document.getElementById("greeting-name").textContent = `Bonjour ${displayName}`;
   const dateStr = new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(new Date());
   document.getElementById("greeting-date").textContent = dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
 

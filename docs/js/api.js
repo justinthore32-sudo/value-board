@@ -47,3 +47,11 @@ function apiPost(path, data) {
 function apiPut(path, data) {
   return apiRequest(path, { method: "PUT", body: JSON.stringify(data) });
 }
+
+function apiPatch(path, data) {
+  return apiRequest(path, { method: "PATCH", body: JSON.stringify(data) });
+}
+
+function apiDelete(path) {
+  return apiRequest(path, { method: "DELETE" });
+}

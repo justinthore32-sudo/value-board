@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Administration — Margin</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#2a78d6">
+<script>
+  if (localStorage.getItem("valueboard_theme") === "dark") { document.documentElement.setAttribute("data-theme", "dark"); }
+</script>
+<script>
+  if (!localStorage.getItem("valueboard_token")) { location.href = "login.html"; }
+  if (localStorage.getItem("valueboard_is_admin") !== "1") { location.href = "index.html"; }
+</script>
+</head>
+<body>
+<div id="layout">
+  <main class="content">
+    <h1>🛡️ Administration</h1>
+    <p class="caption">Gère les comptes qui ont accès à Margin et surveille qui est connecté. Réservé aux comptes admin.</p>
+
+    <div class="card">
+      <h2 style="margin-top:0;">➕ Créer un compte</h2>
+      <form id="create-user-form">
+        <div class="form-row">
+          <div>
+            <label for="nu-username">Nom d'utilisateur</label>
+            <input type="text" id="nu-username" required>
+          </div>
+          <div>
+            <label for="nu-display">Nom affiché (optionnel)</label>
+            <input type="text" id="nu-display">
+          </div>
+        </div>
+        <div class="form-row">
+          <div>
+            <label for="nu-password">Mot de passe</label>
+            <input type="password" id="nu-password" required minlength="4">
+          </div>
+          <div>
+            <label for="nu-password2">Confirme le mot de passe</label>
+            <input type="password" id="nu-password2" required minlength="4">
+          </div>
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="nu-admin">
+          <label for="nu-admin" style="margin:0;">Compte admin (accès à cette page)</label>
+        </div>
+        <div id="create-user-error"></div>
+        <button type="submit" style="margin-top:10px;">Créer le compte</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-top:0;">👥 Comptes</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Utilisateur</th>
+            <th>Nom affiché</th>
+            <th>Rôle</th>
+            <th>Créé le</th>
+            <th>Dernière connexion</th>
+            <th>Dernière activité</th>
+            <th>Durée dernière session</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="users-tbody"></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-top:0;">🟢 Sessions actives</h2>
+      <p class="caption">Le minuteur indique depuis combien de temps chaque session est connectée.</p>
+      <table>
+        <thead>
+          <tr>
+            <th>Compte</th>
+            <th>Connecté depuis</th>
+            <th></th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="sessions-tbody"></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/nav.js"></script>
+<script>
+function formatDate(ts) {
+  if (!ts) return "—";
+  return new Date(ts).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+function formatElapsed(ms) {
+  const mins = Math.floor(ms / 60000);
+  if (mins < 60) return `${mins} min`;
+  const hours = Math.floor(mins / 60);
+  const rem = mins % 60;
+  return `${hours}h${rem ? ` ${rem}min` : ""}`;
+}
+
+let sessionsCache = [];
+
+async function loadUsers() {
+  const { users } = await adminListUsers();
+  const me = localStorage.getItem("valueboard_username");
+  document.getElementById("users-tbody").innerHTML = users.map((u) => `
+    <tr>
+      <td>${u.username}${u.username === me ? " <span class=\"caption\">(toi)</span>" : ""}</td>
+      <td>${u.displayName || ""}</td>
+      <td>${u.isAdmin ? '<span class="badge badge-achat-fort">Admin</span>' : '<span class="badge badge-insuffisant">Utilisateur</span>'}</td>
+      <td>${formatDate(u.createdAt)}</td>
+      <td>${formatDate(u.lastLoginAt)}</td>
+      <td>${formatDate(u.lastSeenAt)}</td>
+      <td>${u.lastSessionDuration || "—"}</td>
+      <td>
+        <button type="button" class="btn-secondary toggle-admin-btn" data-username="${u.username}" data-isadmin="${u.isAdmin ? 1 : 0}" style="padding:5px 10px; font-size:12.5px;">${u.isAdmin ? "Retirer admin" : "Passer admin"}</button>
+        <button type="button" class="btn-danger delete-user-btn" data-username="${u.username}" style="padding:5px 10px; font-size:12.5px;" ${u.username === me ? "disabled" : ""}>Supprimer</button>
+      </td>
+    </tr>
+  `).join("");
+
+  document.querySelectorAll(".toggle-admin-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const username = btn.dataset.username;
+      const isAdminNow = btn.dataset.isadmin === "1";
+      try {
+        await adminUpdateUser(username, { isAdmin: !isAdminNow });
+        showToast(`Rôle mis à jour pour ${username}.`, "success");
+        await loadUsers();
+      } catch (err) {
+        showToast(err.message, "error");
+      }
+    });
+  });
+
+  document.querySelectorAll(".delete-user-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const username = btn.dataset.username;
+      if (!confirm(`Supprimer le compte "${username}" et toutes ses données ? Cette action est irréversible.`)) return;
+      try {
+        await adminDeleteUser(username);
+        showToast(`Compte ${username} supprimé.`, "success");
+        await loadUsers();
+      } catch (err) {
+        showToast(err.message, "error");
+      }
+    });
+  });
+}
+
+async function loadSessions() {
+  const { sessions } = await adminListSessions();
+  sessionsCache = sessions;
+  renderSessions();
+}
+
+function renderSessions() {
+  document.getElementById("sessions-tbody").innerHTML = sessionsCache.map((s) => `
+    <tr>
+      <td>${s.displayName || s.username}</td>
+      <td data-login-at="${s.loginAt || ""}" class="session-elapsed">${s.loginAt ? formatElapsed(Date.now() - s.loginAt) : "—"}</td>
+      <td>${s.isCurrent ? '<span class="badge badge-achat-fort">Cette session</span>' : ""}</td>
+      <td><button type="button" class="btn-danger revoke-session-btn" data-token="${s.tokenId}" style="padding:5px 10px; font-size:12.5px;">Révoquer</button></td>
+    </tr>
+  `).join("");
+
+  document.querySelectorAll(".revoke-session-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      try {
+        await adminRevokeSession(btn.dataset.token);
+        showToast("Session révoquée.", "success");
+        await loadSessions();
+      } catch (err) {
+        showToast(err.message, "error");
+      }
+    });
+  });
+}
+
+setInterval(() => {
+  document.querySelectorAll(".session-elapsed").forEach((td) => {
+    const loginAt = Number(td.dataset.loginAt);
+    if (loginAt) td.textContent = formatElapsed(Date.now() - loginAt);
+  });
+}, 30000);
+
+document.getElementById("create-user-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const username = document.getElementById("nu-username").value.trim();
+  const displayName = document.getElementById("nu-display").value.trim();
+  const password = document.getElementById("nu-password").value;
+  const password2 = document.getElementById("nu-password2").value;
+  const isAdminFlag = document.getElementById("nu-admin").checked;
+  const errorBox = document.getElementById("create-user-error");
+  errorBox.innerHTML = "";
+
+  if (password !== password2) {
+    errorBox.innerHTML = '<div class="error-box" style="margin-top:10px;">Les deux mots de passe ne correspondent pas.</div>';
+    return;
+  }
+  try {
+    await adminCreateUser(username, password, displayName, isAdminFlag);
+    showToast(`Compte ${username} créé.`, "success");
+    e.target.reset();
+    await loadUsers();
+  } catch (err) {
+    errorBox.innerHTML = `<div class="error-box" style="margin-top:10px;">${err.message}</div>`;
+  }
+});
+
+document.addEventListener("DOMContentLoaded", async () => {
+  showLoading();
+  try {
+    await Promise.all([loadUsers(), loadSessions()]);
+  } catch (err) {
+    hideLoading();
+    showToast(`Erreur de chargement : ${err.message}`, "error");
+    return;
+  }
+  hideLoading();
+});
+</script>
+</body>
+</html>

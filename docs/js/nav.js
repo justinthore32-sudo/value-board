@@ -11,15 +11,18 @@ const NAV_ITEMS = [
   ["reglages.html", "⚙️", "Réglages"],
 ];
 
+const ADMIN_NAV_ITEM = ["admin.html", "🛡️", "Administration"];
+
 const EXTERNAL_LINKS = [
   ["https://justinthore32-sudo.github.io/Ju-Board/", "🗞️", "Ju Board"],
 ];
 
 function renderNav() {
   const current = window.location.pathname.split("/").pop() || "index.html";
-  const username = localStorage.getItem("valueboard_username") || "";
+  const username = localStorage.getItem("valueboard_display_name") || localStorage.getItem("valueboard_username") || "";
+  const navItems = isAdmin() ? [...NAV_ITEMS, ADMIN_NAV_ITEM] : NAV_ITEMS;
 
-  const links = NAV_ITEMS.map(([href, icon, label]) => {
+  const links = navItems.map(([href, icon, label]) => {
     const active = href === current ? "active" : "";
     return `<a href="${href}" class="nav-link ${active}">${icon} ${label}</a>`;
   }).join("");
