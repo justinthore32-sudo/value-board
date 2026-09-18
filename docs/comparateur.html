@@ -49,6 +49,9 @@
           <input type="range" id="plafond" min="5" max="100" value="25" step="5">
         </div>
       </div>
+      <label class="checkbox-row" style="margin-top:10px;">
+        <input type="checkbox" id="risk-weight"> Pondérer par le risque (Z-Score) — réduit l'allocation des titres en zone de détresse sans les exclure
+      </label>
 
       <div id="allocation-body" style="margin-top:14px;">
         <div id="allocation-chart" class="chart-box"></div>
@@ -96,8 +99,19 @@ function renderAllocation() {
   document.getElementById("allocation-body").style.display = eligibles.length ? "block" : "none";
   if (!eligibles.length) return;
 
-  const totalScore = eligibles.reduce((s, r) => s + r.score, 0);
-  eligibles = eligibles.map((r) => ({ ...r, poids_pct: (r.score / totalScore) * 100 }));
+  // Pondération par le risque : ne pénalise que jusqu'à 30% de la conviction
+  // (un titre en détresse totale — sous-score Z-Score à 0 — garde 70% de son
+  // poids proportionnel, il n'est jamais exclu). Donnée manquante = pas de
+  // pénalité, cohérent avec le reste du score.
+  const riskWeighted = document.getElementById("risk-weight").checked;
+  eligibles = eligibles.map((r) => {
+    const zSub = r.subScores && r.subScores.z_score !== null && r.subScores.z_score !== undefined ? r.subScores.z_score : 100;
+    const conviction = riskWeighted ? r.score * (0.7 + 0.3 * (zSub / 100)) : r.score;
+    return { ...r, conviction };
+  });
+
+  const totalScore = eligibles.reduce((s, r) => s + r.conviction, 0);
+  eligibles = eligibles.map((r) => ({ ...r, poids_pct: (r.conviction / totalScore) * 100 }));
   eligibles = eligibles.map((r) => ({ ...r, poids_pct: Math.min(r.poids_pct, plafond) }));
   const totalPct = eligibles.reduce((s, r) => s + r.poids_pct, 0);
   eligibles = eligibles.map((r) => ({ ...r, poids_pct: (r.poids_pct / totalPct) * 100 }));
@@ -112,6 +126,7 @@ function renderAllocation() {
 
 document.getElementById("budget").addEventListener("input", renderAllocation);
 document.getElementById("plafond").addEventListener("input", renderAllocation);
+document.getElementById("risk-weight").addEventListener("change", renderAllocation);
 
 document.addEventListener("DOMContentLoaded", async () => {
   showLoading();

@@ -89,3 +89,33 @@ test("pas d'alerte de revue si date future", () => {
   const alerts = portfolioAlerts(portefeuille, watchlist, theses, [], THRESHOLDS);
   assert.ok(!alerts.some((a) => a.type === "Revue de thèse en retard"));
 });
+
+test("alerte de tendance : F-Score en baisse de 2 points ou plus", () => {
+  const historique = [{ date: "2026-01-01", f_score: 7 }, { date: "2026-02-01", f_score: 4 }];
+  const alerts = watchlistAlerts(watchlistRow({ historique }), THRESHOLDS);
+  assert.ok(alerts.some((a) => a.type === "Dégradation F-Score" && a.severity === "warning"));
+});
+
+test("pas d'alerte de tendance F-Score pour une baisse d'1 point", () => {
+  const historique = [{ date: "2026-01-01", f_score: 7 }, { date: "2026-02-01", f_score: 6 }];
+  const alerts = watchlistAlerts(watchlistRow({ historique }), THRESHOLDS);
+  assert.ok(!alerts.some((a) => a.type === "Dégradation F-Score"));
+});
+
+test("alerte de tendance : Z-Score en baisse d'1 point ou plus", () => {
+  const historique = [{ date: "2026-01-01", z_score: 4.0 }, { date: "2026-02-01", z_score: 2.5 }];
+  const alerts = watchlistAlerts(watchlistRow({ historique }), THRESHOLDS);
+  assert.ok(alerts.some((a) => a.type === "Dégradation Z-Score"));
+});
+
+test("alerte de tendance : marge de sécurité divisée par 2 ou plus", () => {
+  const historique = [{ date: "2026-01-01", marge_securite_vis: 30 }, { date: "2026-02-01", marge_securite_vis: 10 }];
+  const alerts = watchlistAlerts(watchlistRow({ historique }), THRESHOLDS);
+  assert.ok(alerts.some((a) => a.type === "Marge de sécurité compressée"));
+});
+
+test("pas d'alerte de tendance avec un seul point d'historique", () => {
+  const historique = [{ date: "2026-01-01", f_score: 8, z_score: 4, marge_securite_vis: 40 }];
+  const alerts = watchlistAlerts(watchlistRow({ historique }), THRESHOLDS);
+  assert.ok(!alerts.some((a) => a.type.startsWith("Dégradation") || a.type === "Marge de sécurité compressée"));
+});

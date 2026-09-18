@@ -37,6 +37,34 @@ function watchlistAlerts(watchlist, thresholds) {
         });
       }
     }
+
+    // Alertes de tendance : comparent les 2 derniers points de l'historique
+    // (voir db.js/snapshotMetrics) — nécessitent au moins 2 snapshots.
+    const hist = row.historique || [];
+    if (hist.length >= 2) {
+      const prev = hist[hist.length - 2];
+      const curr = hist[hist.length - 1];
+
+      if (isNum(prev.f_score) && isNum(curr.f_score) && Number(curr.f_score) - Number(prev.f_score) <= -2) {
+        alerts.push({
+          ticker, nom, categorie: "Watchlist", severity: "warning", type: "Dégradation F-Score",
+          message: `Piotroski F-Score passé de ${prev.f_score} à ${curr.f_score} depuis le ${prev.date}.`,
+        });
+      }
+      if (isNum(prev.z_score) && isNum(curr.z_score) && Number(curr.z_score) - Number(prev.z_score) <= -1) {
+        alerts.push({
+          ticker, nom, categorie: "Watchlist", severity: "warning", type: "Dégradation Z-Score",
+          message: `Altman Z-Score passé de ${Number(prev.z_score).toFixed(2)} à ${Number(curr.z_score).toFixed(2)} depuis le ${prev.date}.`,
+        });
+      }
+      if (isNum(prev.marge_securite_vis) && isNum(curr.marge_securite_vis)
+        && Number(prev.marge_securite_vis) > 0 && Number(curr.marge_securite_vis) < Number(prev.marge_securite_vis) / 2) {
+        alerts.push({
+          ticker, nom, categorie: "Watchlist", severity: "warning", type: "Marge de sécurité compressée",
+          message: `Marge de sécurité passée de ${Number(prev.marge_securite_vis).toFixed(1)}% à ${Number(curr.marge_securite_vis).toFixed(1)}% depuis le ${prev.date}.`,
+        });
+      }
+    }
   }
   return alerts;
 }
