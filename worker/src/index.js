@@ -538,8 +538,9 @@ export default {
     return new Response('Not found', { status: 404, headers: corsHeaders(env) });
   },
 
-  // Cron Trigger quotidien (voir wrangler.toml [triggers]) — même logique
-  // que POST /api/refresh, déclenchée automatiquement pour tous les comptes.
+  // Cron Trigger toutes les 30 min (voir wrangler.toml [triggers]) — même
+  // logique que POST /api/refresh, déclenchée automatiquement pour tous les
+  // comptes.
   async scheduled(event, env, ctx) {
     ctx.waitUntil(refreshAllUsers(env));
   },

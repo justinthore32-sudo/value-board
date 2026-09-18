@@ -20,8 +20,20 @@ function verdictBarChart(elementId, counts) {
   }, { displayModeBar: false, responsive: true });
 }
 
+/* Libellés courts pour les axes du radar — les noms complets de
+   METRIC_LABELS sont trop longs et se font couper par les bords du
+   graphique ; le détail complet reste affiché juste à côté (sous-scores). */
+const RADAR_SHORT_LABELS = {
+  marge_securite: "Marge séc.",
+  f_score: "F-Score",
+  z_score: "Z-Score",
+  dette_ebitda: "Dette/EBITDA",
+  roe: "ROE",
+  dividende: "Dividende",
+};
+
 function radarChart(elementId, series) {
-  const labels = Object.values(METRIC_LABELS);
+  const labels = Object.keys(METRIC_LABELS).map((k) => RADAR_SHORT_LABELS[k] || METRIC_LABELS[k]);
   const keys = Object.keys(METRIC_LABELS);
   const single = series.length === 1;
 
@@ -48,7 +60,7 @@ function radarChart(elementId, series) {
     showlegend: !single,
     legend: { orientation: "h", yanchor: "bottom", y: -0.15 },
     paper_bgcolor: CHART_BG,
-    margin: { l: 40, r: 40, t: 20, b: 20 },
+    margin: { l: 95, r: 78, t: 30, b: 30 },
     height: single ? 380 : 460,
   }, { displayModeBar: false, responsive: true });
 }
