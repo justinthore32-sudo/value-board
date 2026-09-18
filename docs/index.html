@@ -20,7 +20,11 @@
 <body>
 <div id="layout">
   <main class="content">
-    <h1>🧭 ValueBoard</h1>
+    <p style="display:flex; align-items:center; gap:8px; margin:0 0 4px; font-family:'Space Grotesk', sans-serif; font-weight:700; color:var(--blue); font-size:14px; text-transform:uppercase; letter-spacing:.03em;">
+      <img src="favicon.svg" alt="" style="width:18px; height:18px;"> ValueBoard
+    </p>
+    <h1 id="greeting-name">Bonjour</h1>
+    <p class="caption" id="greeting-date" style="margin:0 0 18px;"></p>
     <p class="caption">Un compagnon de décision pour tes recherches Value Investing Screener (VIS) : score, checklist, alertes et comparaison — pour savoir quoi acheter, quand réévaluer, et comment répartir ton capital.</p>
 
     <div id="empty" style="display:none;">
@@ -81,6 +85,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     return;
   }
   hideLoading();
+
+  const username = localStorage.getItem("valueboard_username") || "";
+  document.getElementById("greeting-name").textContent = `Bonjour ${username}`;
+  const dateStr = new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(new Date());
+  document.getElementById("greeting-date").textContent = dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
+
   const watchlist = db.fetchWatchlist();
   if (watchlist.length === 0) {
     document.getElementById("empty").style.display = "block";

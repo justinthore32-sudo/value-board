@@ -31,6 +31,10 @@ function renderNav() {
   const nav = document.createElement("nav");
   nav.className = "sidebar";
   nav.innerHTML = `
+    <div class="sidebar-brand">
+      <img src="favicon.svg" alt="" class="brand-logo">
+      <span class="brand-name">ValueBoard</span>
+    </div>
     <div class="sidebar-links">${links}</div>
     <div class="sidebar-footer">
       <div id="sync-error-banner" class="error-box" style="display:none; margin-bottom:10px; font-size:12px;"></div>
