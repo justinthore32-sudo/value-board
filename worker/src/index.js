@@ -493,14 +493,20 @@ async function handlePutData(request, env, username) {
   return jsonResponse({ ok: true }, env);
 }
 
-/* ---------- AUTO-REFRESH (Finnhub) ----------
-   Ne couvre que le prix/PER/ROE/P-B des tickers cotés sur les places gérées
-   par l'offre gratuite Finnhub (US notamment) ; renvoie null proprement pour
-   les autres (ex. micro-caps parisiens) — laissés inchangés, pas une erreur.
+/* ---------- AUTO-REFRESH (Finnhub, puis filet de secours Yahoo Finance) ----------
+   Finnhub (source principale, officielle) couvre le prix/PER/ROE/P-B des
+   valeurs US/ADR notamment ; renvoie null proprement pour les autres (ex.
+   micro-caps parisiens) — laissés inchangés, pas une erreur. Dans ce cas,
+   un second essai est fait sur Yahoo Finance, qui a une bien meilleure
+   couverture internationale mais n'a PAS d'API publique documentée : le
+   point d'accès utilisé ici (contournement cookie + jeton "crumb") peut
+   changer ou être bloqué par Yahoo sans préavis. En cas d'échec, silencieux
+   comme Finnhub — le titre reste juste non couvert (skipped), jamais une
+   erreur qui casserait le refresh des autres titres.
    La marge de sécurité VIS, le F-Score, le Z-Score et la checklist Graham ne
-   sont volontairement jamais touchés : aucune API ne reproduit la méthode
-   propriétaire de VIS pour la marge de sécurité, et les scores ne sont pas
-   disponibles sur l'offre gratuite. */
+   sont volontairement jamais touchés par aucune des deux sources : aucune
+   API gratuite ne reproduit la méthode propriétaire de VIS pour la marge de
+   sécurité, et ces scores ne sont pas disponibles sur les offres gratuites. */
 
 async function fetchFinnhubData(ticker, env) {
   if (!env.FINNHUB_KEY) return null;
@@ -529,6 +535,76 @@ async function fetchFinnhubData(ticker, env) {
   }
 }
 
+// Cookie + jeton "crumb" requis par les points d'accès non officiels de Yahoo
+// Finance — récupérés une fois par cycle de refresh (pas par ticker) et
+// réutilisés pour tous les titres non couverts par Finnhub ce cycle-là.
+async function getYahooAuth() {
+  try {
+    const cookieRes = await fetch('https://fc.yahoo.com', { headers: { 'User-Agent': 'Mozilla/5.0' } });
+    const setCookie = cookieRes.headers.get('set-cookie');
+    if (!setCookie) return null;
+    const cookie = setCookie.split(';')[0];
+    const crumbRes = await fetch('https://query1.finance.yahoo.com/v1/test/getcrumb', {
+      headers: { 'User-Agent': 'Mozilla/5.0', Cookie: cookie },
+    });
+    if (!crumbRes.ok) return null;
+    const crumb = (await crumbRes.text()).trim();
+    if (!crumb || crumb.includes('<')) return null;
+    return { cookie, crumb };
+  } catch (e) {
+    return null;
+  }
+}
+
+// Le ticker saisi par l'utilisateur (ex. "ALKLH") n'inclut pas le suffixe de
+// place boursière qu'attend Yahoo (ex. "ALKLH.PA") — la recherche Yahoo
+// résout ça sans avoir à deviner/mapper les suffixes par place.
+async function resolveYahooSymbol(ticker) {
+  try {
+    const res = await fetch(`https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(ticker)}`, {
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const quotes = (data.quotes || []).filter((q) => q.quoteType === 'EQUITY' && q.symbol);
+    if (!quotes.length) return null;
+    const exact = quotes.find((q) => q.symbol.split('.')[0].toUpperCase() === ticker.toUpperCase());
+    return (exact || quotes[0]).symbol;
+  } catch (e) {
+    return null;
+  }
+}
+
+async function fetchYahooData(ticker, auth) {
+  if (!auth) return null;
+  try {
+    const symbol = await resolveYahooSymbol(ticker);
+    if (!symbol) return null;
+
+    const url = `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(symbol)}`
+      + `?modules=price,summaryDetail,defaultKeyStatistics,financialData&crumb=${encodeURIComponent(auth.crumb)}`;
+    const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0', Cookie: auth.cookie } });
+    if (!res.ok) return null;
+
+    const data = await res.json();
+    const r = data.quoteSummary && data.quoteSummary.result && data.quoteSummary.result[0];
+    if (!r) return null;
+
+    const prix_actuel = typeof r.price?.regularMarketPrice?.raw === 'number' ? r.price.regularMarketPrice.raw : undefined;
+    const per = typeof r.summaryDetail?.trailingPE?.raw === 'number' ? r.summaryDetail.trailingPE.raw : undefined;
+    const pb = typeof r.defaultKeyStatistics?.priceToBook?.raw === 'number' ? r.defaultKeyStatistics.priceToBook.raw : undefined;
+    // Yahoo renvoie returnOnEquity en fraction (0.0823 = 8.23%) — Finnhub et
+    // le reste de l'app attendent un nombre en pourcentage (8.23), d'où le ×100.
+    const roeFraction = typeof r.financialData?.returnOnEquity?.raw === 'number' ? r.financialData.returnOnEquity.raw : undefined;
+    const roe = roeFraction !== undefined ? roeFraction * 100 : undefined;
+
+    if (prix_actuel === undefined) return null;
+    return { prix_actuel, per, roe, pb };
+  } catch (e) {
+    return null;
+  }
+}
+
 async function refreshWatchlistDataFor(env, username) {
   const raw = await env.STORE.get(`data:${username}`);
   if (!raw) return { updated: 0, skipped: 0 };
@@ -539,9 +615,25 @@ async function refreshWatchlistDataFor(env, username) {
   const thresholds = (data.settings && data.settings.thresholds) || DEFAULT_THRESHOLDS;
   let updated = 0;
   let skipped = 0;
+  let yahooAuth = null;
+  let yahooAuthTried = false;
 
   for (const row of data.watchlist || []) {
-    const fresh = await fetchFinnhubData(row.ticker, env);
+    let fresh = await fetchFinnhubData(row.ticker, env);
+    let source = 'finnhub';
+
+    // Filet de secours Yahoo, seulement si Finnhub est configuré (évite tout
+    // appel réseau superflu en local/tests, où FINNHUB_KEY est absent) et
+    // seulement quand Finnhub n'a rien renvoyé pour ce titre.
+    if (!fresh && env.FINNHUB_KEY) {
+      if (!yahooAuthTried) {
+        yahooAuth = await getYahooAuth();
+        yahooAuthTried = true;
+      }
+      fresh = await fetchYahooData(row.ticker, yahooAuth);
+      source = 'yahoo';
+    }
+
     if (!fresh) {
       skipped += 1;
       continue;
@@ -551,6 +643,7 @@ async function refreshWatchlistDataFor(env, username) {
     if (fresh.roe !== undefined) row.roe = fresh.roe;
     if (fresh.pb !== undefined) row.pb = fresh.pb;
     row.derniere_maj_auto = today;
+    row.derniere_maj_source = source;
     row.historique = [...(row.historique || []), snapshotMetricsValue(row, weights, thresholds)];
     updated += 1;
   }
