@@ -33,7 +33,7 @@ function renderNav() {
   nav.innerHTML = `
     <div class="sidebar-brand">
       <img src="favicon.svg" alt="" class="brand-logo">
-      <span class="brand-name">ValueBoard</span>
+      <span class="brand-name">Margin</span>
     </div>
     <div class="sidebar-links">${links}</div>
     <div class="sidebar-footer">

@@ -1,4 +1,4 @@
-/* Couche de données pour ValueBoard — synchronisée avec le Worker Cloudflare
+/* Couche de données pour Margin — synchronisée avec le Worker Cloudflare
    (voir api.js). Un cache mémoire est chargé une fois par page via
    `await db.sync()`, puis toutes les lectures/écritures se font dessus ;
    chaque écriture renvoie l'intégralité du blob au Worker en arrière-plan

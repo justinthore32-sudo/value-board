@@ -1,6 +1,6 @@
 {
-  "name": "ValueBoard",
-  "short_name": "ValueBoard",
+  "name": "Margin",
+  "short_name": "Margin",
   "description": "Tableau de bord d'aide à la décision pour le value investing",
   "start_url": "index.html",
   "display": "standalone",
