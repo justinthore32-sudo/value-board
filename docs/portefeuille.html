@@ -59,6 +59,11 @@
       <div id="pf-alerts" style="margin-top:16px;"></div>
 
       <hr class="divider">
+      <h2>📈 Suivi de performance</h2>
+      <p class="caption">Compare le score/verdict au moment de l'achat (déduit de l'historique du titre sur la Watchlist) à la performance depuis — pour savoir si la méthode de sélection fonctionne réellement pour toi dans la durée.</p>
+      <div id="performance-tracking"></div>
+
+      <hr class="divider">
       <h2>✏️ Mettre à jour le prix / modifier / supprimer une position</h2>
       <label>Sélectionner une position</label>
       <select id="edit-select"></select>
@@ -87,6 +92,16 @@
 <script src="js/nav.js"></script>
 <script>
 function numOrNull(v) { return v === "" || v === null ? null : Number(v); }
+
+// Cherche, dans l'historique du titre sur la Watchlist (Phase A), le
+// dernier snapshot à la date d'achat ou avant — jamais un snapshot postérieur,
+// qui donnerait une fausse impression de "score au moment de l'achat".
+function scoreAtPurchase(ticker, dateAchat, watchlist) {
+  const wl = watchlist.find((w) => w.ticker === ticker);
+  if (!wl || !wl.historique) return null;
+  const candidates = wl.historique.filter((h) => !dateAchat || h.date <= dateAchat);
+  return candidates.length ? candidates[candidates.length - 1] : null;
+}
 
 function refresh() {
   const df = db.fetchPortefeuille();
@@ -125,6 +140,17 @@ function refresh() {
       <td>${r.plusValue.toFixed(2)}</td><td>${r.alertes ? "⚠️ " + r.alertes : "—"}</td><td>${r.date_achat || ""}</td>
     </tr>
   `).join("");
+
+  document.getElementById("performance-tracking").innerHTML = `
+    <table>
+      <thead><tr><th>Ticker</th><th>Score à l'achat</th><th>Verdict à l'achat</th><th>Performance depuis</th></tr></thead>
+      <tbody>${rows.map((r) => {
+        const snap = scoreAtPurchase(r.ticker, r.date_achat, watchlist);
+        const scoreTxt = snap ? (snap.score !== null && snap.score !== undefined ? `${snap.score}/100` : "N/A") : "—";
+        const verdictTxt = snap ? snap.verdict : "Score initial non disponible";
+        return `<tr><td>${r.ticker}</td><td>${scoreTxt}</td><td>${verdictTxt}</td><td>${r.perfPct >= 0 ? "+" : ""}${r.perfPct.toFixed(1)}%</td></tr>`;
+      }).join("")}</tbody>
+    </table>`;
 
   document.getElementById("pf-alerts").innerHTML = pfAlerts.length ? `<h2>⚠️ Alertes sur le portefeuille</h2>` + pfAlerts.map((a) => `
     <div class="alert-row">${SEVERITY_ICON[a.severity]} <strong>${a.ticker}</strong> — <em>${a.type}</em> : <span class="msg">${a.message}</span></div>
