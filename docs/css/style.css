@@ -82,6 +82,10 @@ h2, h3, .logo-mark {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
 }
 
 .sidebar-brand { display: flex; align-items: center; gap: 8px; padding: 4px 10px 18px; }
@@ -114,6 +118,9 @@ h2, h3, .logo-mark {
     border-right: none;
     border-bottom: 1px solid var(--border);
     display: none;
+    position: static;
+    height: auto;
+    overflow-y: visible;
   }
   .sidebar.open { display: flex; }
 
