@@ -253,10 +253,57 @@ document.getElementById("g-calc").addEventListener("click", () => {
   box.innerHTML = `
     <div class="kpi"><div class="label">Valeur intrinsèque</div><div class="value">${vi.toFixed(2)}</div></div>
     ${marge !== null ? `<div class="kpi" style="margin-top:8px;"><div class="label">Marge de sécurité</div><div class="value">${marge.toFixed(1)}%</div></div>` : ""}
+    ${marge !== null ? `<button type="button" class="btn-secondary use-marge-btn" data-marge="${marge}" style="margin-top:10px;">Utiliser comme marge de sécurité VIS</button>` : ""}
     <div class="success-box" style="margin-top:10px;">Calcul enregistré — les alertes de portefeuille en tiendront compte.</div>`;
   db.addValorisation({ ticker: row.ticker, methode: "Graham Number", parametres: `BPA=${bpa}; VCPA=${vcpa}`, valeur_intrinseque: vi, prix_actuel: prix || null, marge_securite: marge });
   loadTitle(currentRowId, true);
 });
+
+document.getElementById("calc-result").addEventListener("click", (e) => {
+  const btn = e.target.closest(".use-marge-btn");
+  if (!btn) return;
+  db.updateWatchlistRow(currentRowId, { marge_securite_vis: Number(btn.dataset.marge) });
+  showToast("Marge de sécurité VIS mise à jour à partir du calcul.", "success");
+  loadTitle(currentRowId, true);
+});
+
+// Isole le calcul pour pouvoir le rejouer sur une grille de sensibilité
+// (taux d'actualisation × croissance terminale) sans dupliquer la boucle.
+function computeDcfValue(fcf, nbActions, croissancePct, tauxPct, gTermPct, nbAnnees) {
+  const g = croissancePct / 100, r = tauxPct / 100, gt = gTermPct / 100;
+  if (!(r > gt) || !(nbActions > 0)) return null;
+  let valeurActualisee = 0, f = fcf;
+  for (let annee = 1; annee <= nbAnnees; annee++) {
+    f *= (1 + g);
+    valeurActualisee += f / Math.pow(1 + r, annee);
+  }
+  const vt = f * (1 + gt) / (r - gt);
+  const vtActualisee = vt / Math.pow(1 + r, nbAnnees);
+  return (valeurActualisee + vtActualisee) / nbActions;
+}
+
+function renderDcfSensitivity(fcf, nbActions, croissance, taux, gTerm, nbAnnees) {
+  const tauxOffsets = [-1, 0, 1];
+  const gtOffsets = [-0.5, 0, 0.5];
+  const rows = tauxOffsets.map((dt) => {
+    const t = taux + dt;
+    const cells = gtOffsets.map((dg) => {
+      const v = computeDcfValue(fcf, nbActions, croissance, t, gTerm + dg, nbAnnees);
+      const center = dt === 0 && dg === 0 ? "font-weight:700; background:var(--hover-bg);" : "";
+      return `<td style="${center}">${v !== null ? v.toFixed(2) : "—"}</td>`;
+    }).join("");
+    return `<tr><td>${t.toFixed(1)}%</td>${cells}</tr>`;
+  }).join("");
+  return `
+    <div style="margin-top:14px;">
+      <h3 style="margin-top:0;">Sensibilité (taux d'actualisation × croissance terminale)</h3>
+      <p class="caption">Un petit écart sur ces deux hypothèses fait varier la valeur intrinsèque nettement — ne te fie pas au seul chiffre central.</p>
+      <table>
+        <thead><tr><th>Taux \\ g. terminale</th>${gtOffsets.map((dg) => `<th>${(gTerm + dg).toFixed(1)}%</th>`).join("")}</tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+}
 
 document.getElementById("d-calc").addEventListener("click", () => {
   const fcf = Number(document.getElementById("d-fcf").value);
@@ -267,20 +314,11 @@ document.getElementById("d-calc").addEventListener("click", () => {
   const nbAnnees = Number(document.getElementById("d-annees").value);
   const box = document.getElementById("calc-result");
 
-  const g = croissance / 100, r = taux / 100, gt = gTerm / 100;
-  if (r <= gt || !(nbActions > 0)) {
+  const vi = computeDcfValue(fcf, nbActions, croissance, taux, gTerm, nbAnnees);
+  if (vi === null) {
     box.innerHTML = '<div class="error-box">Vérifie que le taux d\'actualisation > croissance terminale et que le nombre d\'actions est positif.</div>';
     return;
   }
-  let valeurActualisee = 0, f = fcf;
-  for (let annee = 1; annee <= nbAnnees; annee++) {
-    f *= (1 + g);
-    valeurActualisee += f / Math.pow(1 + r, annee);
-  }
-  const vt = f * (1 + gt) / (r - gt);
-  const vtActualisee = vt / Math.pow(1 + r, nbAnnees);
-  const valeurEntreprise = valeurActualisee + vtActualisee;
-  const vi = valeurEntreprise / nbActions;
 
   const watchlist = db.fetchWatchlist();
   const row = watchlist.find((rr) => rr.id === currentRowId);
@@ -290,7 +328,9 @@ document.getElementById("d-calc").addEventListener("click", () => {
   box.innerHTML = `
     <div class="kpi"><div class="label">Valeur intrinsèque par action</div><div class="value">${vi.toFixed(2)}</div></div>
     ${marge !== null ? `<div class="kpi" style="margin-top:8px;"><div class="label">Marge de sécurité</div><div class="value">${marge.toFixed(1)}%</div></div>` : ""}
-    <div class="success-box" style="margin-top:10px;">Calcul enregistré — les alertes de portefeuille en tiendront compte.</div>`;
+    ${marge !== null ? `<button type="button" class="btn-secondary use-marge-btn" data-marge="${marge}" style="margin-top:10px;">Utiliser comme marge de sécurité VIS</button>` : ""}
+    <div class="success-box" style="margin-top:10px;">Calcul enregistré — les alertes de portefeuille en tiendront compte.</div>
+    ${renderDcfSensitivity(fcf, nbActions, croissance, taux, gTerm, nbAnnees)}`;
   db.addValorisation({
     ticker: row.ticker, methode: "DCF simplifié",
     parametres: `FCF=${fcf}M; croissance=${croissance}%; taux=${taux}%; g_term=${gTerm}%; annees=${nbAnnees}`,
