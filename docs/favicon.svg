@@ -1,4 +1,9 @@
 <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
-  <circle cx="32" cy="32" r="30" fill="#2a78d6"/>
-  <polyline points="15,47 15,16 32,34 49,16 49,47" fill="none" stroke="#ffffff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@1,800&amp;display=swap');
+    .mark { font-family: "Playfair Display", Georgia, serif; font-style: italic; font-weight: 800; fill: #ffffff; }
+  </style>
+  <circle cx="32" cy="32" r="30" fill="#122a4d"/>
+  <text class="mark" x="33" y="43" text-anchor="middle" font-size="34">M</text>
+  <rect x="24" y="47" width="16" height="3" rx="1.5" fill="#2a78d6"/>
 </svg>
